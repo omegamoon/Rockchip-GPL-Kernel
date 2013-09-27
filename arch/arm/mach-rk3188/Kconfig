@@ -1,0 +1,568 @@
+choice
+	prompt "Rockchip SoC Type"
+	depends on ARCH_RK3188
+
+config SOC_RK3188
+	bool "RK3188"
+
+endchoice
+
+choice
+	prompt "RK3188 Board Type"
+	depends on SOC_RK3188
+
+config MACH_RK3188_TB
+	bool "RK3188 Top Board"
+
+config MACH_RK3188_FPGA
+	bool "RK3188 FPGA board"
+	select RK_FPGA
+
+config MACH_RK3188_LR097
+        bool "RK3188 LR097 JC21CA board"
+
+config MACH_RK3188_DS1006H
+	bool "RK3188 ds1006h board"
+
+config MACH_RK3188_BOX
+	bool "RK3188 box board"
+	
+endchoice
+
+
+menu "RK3188 Custom Tweaks"
+ 	depends on ARCH_RK3188 && MACH_RK3188_BOX
+
+config TCC_BT_DEV_POWER_PIN3_PD1
+	depends on TCC_BT_DEV
+	bool "Set TCC BT dev pwer to pin3 pd1"
+	default n
+
+config ACT8846_DCDC4_30V
+	depends on REGULATOR_ACT8846
+	bool "Set ACT8846 DCDC4 to 3.0V"
+	default n
+
+config ACT8846_LDO6_18V
+	depends on REGULATOR_ACT8846
+	bool "Set ACT8846 LDO6 to 1.8V"
+	default n
+	
+config POWERON_LED_ENABLE
+	bool "Enable PowerOn LED (MK908)"
+	default n
+
+menu	"RFKILL_RK POWERON GPIO"
+	depends on RFKILL_RK
+config RFKILL_RK_POWERON_ENABLE
+	bool "RFKILL_RK POWERON Enabled"
+	default y
+config RFKILL_RK_POWERON_GPIO
+        depends on RFKILL_RK_POWERON_ENABLE
+	int "RFKILL_RK POWERON GPIO value"
+	default 279
+        help
+	  Use GPIO_DUMP utility to determine correct GPIO from stock kernel.
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  K-R42 aka MK888 aka CS918: 279 (RK30_PIN3_PC7; ID 'btdefault')
+	  MK908                    : -1 (INVALID_GPIO; ID 'ap6210')
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+config RFKILL_RK_POWERON_IOMUX
+        depends on RFKILL_RK_POWERON_ENABLE
+	hex "RFKILL_RK POWERON IOMUX value"
+	default 0x3c70
+        help
+          The IOMUX value should correspond to the GPIO 
+          If unsure, use the default value!
+	  
+	  K-R42 aka MK888 aka CS918: 0x3c70 (GPIO3_C7)
+	  MK908                    : 0x3c70 (GPIO3_C7)
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               :
+
+          See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
+endmenu
+
+menu	"RFKILL_RK RESET GPIO"
+	depends on RFKILL_RK
+config RFKILL_RK_RESET_ENABLE
+	bool "RFKILL_RK RESET Enabled"
+	default y
+config RFKILL_RK_RESET_GPIO
+	depends on RFKILL_RK_RESET_ENABLE
+	int "RFKILL_RK RESET GPIO value"
+	default 281
+        help
+	  Use GPIO_DUMP utility to determine correct GPIO from stock kernel.
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  K-R42 aka MK888 aka CS918: 281 (RK30_PIN3_PD1; ID 'btdefault')
+	  MK908                    : 281 (RK30_PIN3_PD1; ID 'ap6210')
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+config RFKILL_RK_RESET_IOMUX
+	depends on RFKILL_RK_RESET_ENABLE
+	hex "RFKILL_RK RESET IOMUX value"
+	default 0x3d10
+        help
+          The IOMUX value should correspond to the GPIO 
+          If unsure, use the default value!
+	  
+	  K-R42 aka MK888 aka CS918: 0x3d10 (GPIO3_D1)
+	  MK908                    : 0x3d10 (GPIO3_D1)
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
+endmenu
+
+menu	"RFKILL_RK WAKE GPIO"
+	depends on RFKILL_RK
+config RFKILL_RK_WAKE_ENABLE
+	bool "RFKILL_RK WAKE Enabled"
+	default y
+config RFKILL_RK_WAKE_GPIO
+	depends on RFKILL_RK_WAKE_ENABLE
+	int "RFKILL_RK WAKE GPIO value"
+	default 278
+        help
+	  Use GPIO_DUMP utility to determine correct GPIO from stock kernel.
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  K-R42 aka MK888 aka CS918: 278 (RK30_PIN3_PC6; ID 'btdefault')
+	  MK908                    : 278 (RK30_PIN3_PC6; ID 'ap6210')
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+config RFKILL_RK_WAKE_IOMUX
+	depends on RFKILL_RK_WAKE_ENABLE
+	hex "RFKILL_RK WAKE IOMUX value"
+	default 0x3c60
+        help
+          The IOMUX value should correspond to the GPIO 
+          If unsure, use the default value!
+	  
+	  K-R42 aka MK888 aka CS918: 0x3c60 (GPIO3_C6)
+	  MK908                    : 0x3c60 (GPIO3_C6)
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
+endmenu
+
+menu	"RFKILL_RK WAKE HOST GPIO"
+	depends on RFKILL_RK
+config RFKILL_RK_WAKEHOST_ENABLE
+	bool "RFKILL_RK WAKE HOST Enabled"
+	default y
+config RFKILL_RK_WAKEHOST_GPIO
+	depends on RFKILL_RK_WAKEHOST_ENABLE
+	int "RFKILL_RK WAKE HOST GPIO value"
+	default 282
+        help
+	  Use GPIO_DUMP utility to determine correct GPIO from stock kernel.
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  K-R42 aka MK888 aka CS918: 282 (RK30_PIN3_PD2; ID 'btdefault')
+	  MK908                    : 279 (RK30_PIN3_PC7; ID 'ap6210')
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+config RFKILL_RK_WAKEHOST_IOMUX
+	depends on RFKILL_RK_WAKEHOST_ENABLE
+	hex "RFKILL_RK WAKE HOST IOMUX value"
+	default 0x3d20
+        help
+          The IOMUX value should correspond to the GPIO 
+          If unsure, use the default value!
+	  
+	  K-R42 aka MK888 aka CS918: 0x3d20 (GPIO3_D2)
+	  MK908                    : 0x3c70 (GPIO3_C7)
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
+endmenu
+
+menu	"RFKILL_RK UART_RTS GPIO"
+	depends on RFKILL_RK
+config RFKILL_RK_RTS_ENABLE
+	bool "RFKILL_RK UART_RTS Enabled"
+	default y
+config RFKILL_RK_RTS_GPIO
+	depends on RFKILL_RK_RTS_ENABLE
+	int "RFKILL_RK UART_RTS GPIO value"
+	default 195
+        help
+	  Use GPIO_DUMP utility to determine correct GPIO from stock kernel.
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  K-R42 aka MK888 aka CS918: 195 (RK30_PIN1_PA3; ID 'btdefault')
+	  MK908                    : 195 (RK30_PIN1_PA3; ID 'ap6210')
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+config RFKILL_RK_RTS_IOMUX
+	depends on RFKILL_RK_RTS_ENABLE
+	hex "RFKILL_RK UART_RTS IOMUX value"
+	default 0x1a30
+        help
+          The IOMUX value should correspond to the GPIO 
+          If unsure, use the default value!
+	  
+	  K-R42 aka MK888 aka CS918: 0x1a30 (GPIO1_A3)
+	  MK908                    : 0x1a30 (GPIO1_A3)
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
+endmenu
+
+menu	"RK1000 RESET GPIO"
+	depends on MFD_RK1000
+config RK1000_RESET_GPIO
+	int "RK1000 RESET GPIO value"
+	default 284
+        help
+	  Use GPIO_DUMP utility to determine correct GPIO from stock kernel.
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  Rockchip default         : 284 (RK30_PIN3_PD4)
+	  K-R42 aka MK888 aka CS918: 191 (RK30_PIN0_PD7)
+	  MK908                    : N/A
+	  Rikomagic MK802IV        : 
+	  Radxa Rock               : 
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+endmenu
+
+config VSYNCFIX_SAM321
+  bool "Workaround for jerky video playback by returning -EFAULT in RK_FBIOSET_VSYNC_ENABLE - recommended (sam321)"
+  default n
+
+config VSYNCFIX_PHJA
+  bool "Workaround for jerky video playback by disabling the ktime_equal check in the vsync handler - not recommended (phjanderson)"
+  default n
+
+choice 	
+  prompt "Primary LCDC display type"
+
+config RK_LCDC0_AS_PRIMARY
+  bool "LCDC0 is primary and LCDC1 is extended display device"
+  
+config RK_LCDC1_AS_PRIMARY
+  bool "LCDC0 is extended and LCDC1 is primary display device"
+  
+endchoice
+
+menu	"CPU Frequency Scaling"
+
+config	RK_CPU_312
+	bool "312 MHz CPU"
+	default y
+
+config	RK_CPU_312_VOLT
+	depends on RK_CPU_312
+	int "312 MHz CPU voltage (mV)"
+	default "900"
+
+config	RK_CPU_504
+	bool "504 MHz CPU"
+	default y
+
+config	RK_CPU_504_VOLT
+	depends on RK_CPU_504
+	int "504 MHz CPU voltage (mV)"
+	default "925"
+
+config	RK_CPU_816
+	bool "816 MHz CPU"
+	default y
+
+config	RK_CPU_816_VOLT
+	depends on RK_CPU_816
+	int "816 MHz CPU voltage (mV)"
+	default "1000"
+
+config	RK_CPU_1008
+	bool "1008 MHz CPU"
+	default y
+
+config	RK_CPU_1008_VOLT
+	depends on RK_CPU_1008
+	int "1008 MHz CPU voltage (mV)"
+	default "1075"
+
+config	RK_CPU_1200
+	bool "1200 MHz CPU"
+	default y
+
+config	RK_CPU_1200_VOLT
+	depends on RK_CPU_1200
+	int "1200 MHz CPU voltage (mV)"
+	default "1150"
+
+config	RK_CPU_1416
+	bool "1416 MHz CPU"
+	default y
+
+config	RK_CPU_1416_VOLT
+	depends on RK_CPU_1416
+	int "1416 MHz CPU voltage (mV)"
+	default "1250"
+
+config	RK_CPU_1608
+	bool "1608 MHz CPU"
+	default y
+
+config	RK_CPU_1608_VOLT
+	depends on RK_CPU_1608
+	int "1608 MHz CPU voltage (mV)"
+	default "1350"
+
+config	RK_CPU_1704
+	bool "1704 MHz CPU (overclock!)"
+	default n
+
+config	RK_CPU_1704_VOLT
+	depends on RK_CPU_1704
+	int "1704 MHz CPU voltage (mV)"
+	default "1375"
+
+config	RK_CPU_1800
+	bool "1800 MHz CPU (overclock!)"
+	default n
+
+config	RK_CPU_1800_VOLT
+	depends on RK_CPU_1800
+	int "1800 MHz CPU voltage (mV)"
+	default "1375"
+
+config	RK_CPU_1896
+	bool "1896 MHz CPU (overclock!)"
+	default n
+
+config	RK_CPU_1896_VOLT
+	depends on RK_CPU_1896
+	int "1896 MHz CPU voltage (mV)"
+	default "1375"
+
+config	RK_CPU_1920
+	bool "1920 MHz CPU (overclock!)"
+	default n
+
+config	RK_CPU_1920_VOLT
+	depends on RK_CPU_1920
+	int "1920 MHz CPU voltage (mV)"
+	default "1400"
+
+config	RK_CPU_2016
+	bool "2016 MHz CPU (overclock!)"
+	default n
+
+config	RK_CPU_2016_VOLT
+	depends on RK_CPU_2016
+	int "2016 MHz CPU voltage (mV)"
+	default "1425"
+
+endmenu
+
+
+menu	"GPU Frequency Scaling"
+
+config	RK_GPU_133
+	bool "133 MHz GPU"
+	default y
+
+config	RK_GPU_133_VOLT
+	depends on RK_GPU_133
+	int "133 MHz GPU voltage (mV)"
+	default "975"
+
+config	RK_GPU_200
+	bool "200 MHz GPU"
+	default y
+
+config	RK_GPU_200_VOLT
+	depends on RK_GPU_200
+	int "200 MHz GPU voltage (mV)"
+	default "1000"
+
+config	RK_GPU_266
+	bool "266 MHz GPU"
+	default y
+
+config	RK_GPU_266_VOLT
+	depends on RK_GPU_266
+	int "266 MHz GPU voltage (mV)"
+	default "1025"
+
+config	RK_GPU_300
+	bool "300 MHz GPU"
+	default y
+
+config	RK_GPU_300_VOLT
+	depends on RK_GPU_300
+	int "300 MHz GPU voltage (mV)"
+	default "1050"
+
+config	RK_GPU_400
+	bool "400 MHz GPU"
+	default y
+
+config	RK_GPU_400_VOLT
+	depends on RK_GPU_400
+	int "400 MHz GPU voltage (mV)"
+	default "1100"
+
+config	RK_GPU_600
+	bool "600 MHz GPU"
+	default y
+
+config	RK_GPU_600_VOLT
+	depends on RK_GPU_600
+	int "600 MHz GPU voltage (mV)"
+	default "1250"
+
+config	RK_GPU_798
+	bool "798 MHz GPU (overclock!)"
+	default n
+
+config	RK_GPU_798_VOLT
+	depends on RK_GPU_798
+	int "798 MHz GPU voltage (mV)"
+	default "1325"
+
+endmenu
+
+
+menu	"DDR RAM Frequency Scaling"
+
+config	RK_DDR_300
+	bool "300 MHz DDR"
+	default n
+
+config	RK_DDR_300_VOLT
+	depends on RK_DDR_300
+	int "300 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_360
+	bool "360 MHz DDR"
+	default n
+
+config	RK_DDR_360_VOLT
+	depends on RK_DDR_360
+	int "360 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_400
+	bool "400 MHz DDR"
+	default y
+
+config	RK_DDR_400_VOLT
+	depends on RK_DDR_400
+	int "400 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_500
+	bool "500 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_500_VOLT
+	depends on RK_DDR_500
+	int "500 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_536
+	bool "536 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_536_VOLT
+	depends on RK_DDR_536
+	int "536 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_600
+	bool "600 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_600_VOLT
+	depends on RK_DDR_600
+	int "600 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_640
+	bool "640 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_640_VOLT
+	depends on RK_DDR_640
+	int "640 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_672
+	bool "672 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_672_VOLT
+	depends on RK_DDR_672
+	int "672 MHz DDR voltage (mV)"
+	default "1100"
+
+config	RK_DDR_700
+	bool "700 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_700_VOLT
+	depends on RK_DDR_700
+	int "700 MHz DDR voltage (mV)"
+	default "1200"
+
+config	RK_DDR_720
+	bool "720 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_720_VOLT
+	depends on RK_DDR_720
+	int "720 MHz DDR voltage (mV)"
+	default "1200"
+
+config	RK_DDR_768
+	bool "768 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_768_VOLT
+	depends on RK_DDR_768
+	int "768 MHz DDR voltage (mV)"
+	default "1200"
+	
+config	RK_DDR_800
+	bool "800 MHz DDR (overclock!)"
+	default n
+
+config	RK_DDR_800_VOLT
+	depends on RK_DDR_800
+	int "800 MHz DDR voltage (mV)"
+	default "1200"
+
+endmenu
+
+
+endmenu
+

@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Start the gpio driver
+#
+
+start() {
+        echo "Starting gpio..."
+
+        # load driver
+        /sbin/modprobe user-gpio-drv
+}
+stop() {
+        echo "Stopping gpio..."
+
+	/sbin/modprobe -r user-gpio-drv
+}
+restart() {
+        stop
+        start
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        restart
+        ;;
+  *)
+        echo $"Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+
+exit $?
+
