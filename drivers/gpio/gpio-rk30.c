@@ -97,6 +97,7 @@ static int rk30_gpiolib_request(struct gpio_chip *chip, unsigned offset);
 		.irq = IRQ_GPIO##ID, \
 		.regbase = (unsigned char __iomem *) RK30_GPIO##ID##_BASE, \
 	}
+//Galland: the "ID < 6 ?" above is due to RK30 having GPIO5_BASE unavailable as gpios (but GPIO6 ports are)
 
 static struct rk30_gpio_bank rk30_gpio_banks[] = {
 	RK30_GPIO_BANK(0),
