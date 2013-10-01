@@ -1271,7 +1271,45 @@ static struct platform_device rockchip_hdmi_audio = {
 };
 #endif
 /*$_rbox_$_modify_$_zhengyang_end$_20130407_$*/
+//leolas RDA5876 BT chip support (QX1 and old MK802IV)
+#if defined CONFIG_TCC_BT_DEV
+static struct tcc_bt_platform_data tcc_bt_platdata = {
 
+    .power_gpio   = { // ldoon
+//SAW QX1 setting thanks to Leolas
+#ifdef CONFIG_IMITO_QX1
+        .io             = RK30_PIN3_PD1,//leolas:for QX1
+#else
+        .io             = RK30_PIN3_PC7,//leolas:not absolutely sure but I think this value must work for old MK802IV
+#endif
+        .enable         = GPIO_HIGH,
+        .iomux          = {
+            .name       = NULL,
+            },
+        },
+
+    .wake_host_gpio  = { // BT_HOST_WAKE, for bt wakeup host when it is in deep sleep
+#ifdef CONFIG_IMITO_QX1
+        .io             = RK30_PIN3_PC6, //leolas:for QX1
+#else
+        .io             = RK30_PIN3_PD0, //leolas:not absolutely sure but I think this value must work for old MK802IV
+#endif
+        .enable     = IRQF_TRIGGER_RISING,// set IRQF_TRIGGER_FALLING for falling, set IRQF_TRIGGER_RISING for rising
+        .iomux      = {
+            .name       = NULL,
+        },
+    },
+};
+
+static struct platform_device device_tcc_bt = {
+    .name   = "tcc_bt_dev",
+    .id     = -1,
+    .dev    = {
+        .platform_data = &tcc_bt_platdata,
+        },
+};
+#endif
+//leolas RDA5876 BT chip support end
 static struct platform_device *devices[] __initdata = {
 
 #ifdef CONFIG_ION
@@ -1313,6 +1351,11 @@ static struct platform_device *devices[] __initdata = {
 	&rockchip_hdmi_audio,
 #endif
 /*$_rbox_$_modify_$_zhengyang_end$_20130407_$*/
+
+//leolas RDA5876 BT chip support
+#ifdef CONFIG_TCC_BT_DEV
+        &device_tcc_bt,
+#endif //leolas end RDA5876 BT chip support
 };
 
 
@@ -1495,13 +1538,14 @@ static struct pmu_info  act8846_dcdc_info[] = {
 	{
 		.name          = "act_dcdc4",   //vccio 
 //SAW special voltage for QX1, from Leolas
-#ifdef CONFIG_ACT8846_DCDC4_30V
+#ifdef CONFIG_IMITO_QX1
 		.min_uv		= 3000000,
 		.max_uv		= 3000000,
 #else
 		.min_uv         = 3300000,
 		.max_uv         = 3300000,
 #endif
+
 		#ifdef CONFIG_ACT8846_SUPPORT_RESET
 		.suspend_vol  =  3000000,
 		#else
@@ -1538,14 +1582,13 @@ static  struct pmu_info  act8846_ldo_info[] = {
 	},
 	{
 		.name          = "act_ldo6",   //vcc_jetta
-//SAW volt set via kernel config, default 3300000, mk908 and some others
-//need 1800000 to get wifi/bt working properly
-#ifdef CONFIG_ACT8846_LDO6_18V
-		.min_uv         = 1800000, 
-		.max_uv         = 1800000, 
-#else
+//SAW volt set via kernel config, default 1800000 for all devices except QX1
+#ifdef CONFIG_IMITO_QX1
 		.min_uv		= 3300000,
 		.max_uv		= 3300000,
+#else
+		.min_uv         = 1800000, 
+		.max_uv         = 1800000, 
 #endif
 	},
 	{
@@ -1756,7 +1799,11 @@ static struct i2c_board_info __initdata i2c1_info[] = {
 		.type                   = "rtc_hym8563",
 		.addr           = 0x51,
 		.flags                  = 0,
-		.irq            = RK30_PIN0_PB5,
+#ifdef CONFIG_IMITO_QX1
+		.irq            = RK30_PIN1_PA4,//for imito QX1
+#else
+		.irq            = RK30_PIN0_PB5,//leolas:for the rest of devices
+#endif
 	},
 #endif
 #if defined (CONFIG_MFD_WM831X_I2C)

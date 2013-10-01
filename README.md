@@ -1,6 +1,6 @@
 Linux kernel for Rockchip SOCs - www.omegamoon.com
 --------------
-
+QX1 work on progress (not ended yet)
 **Build instructions:**
 - Run "make mrproper" to make sure you have no stale .o files and dependencies lying around
 - Run "./build_omegamoon_mk908" to compile the kernel for the MK908 using the prebuild toolchain

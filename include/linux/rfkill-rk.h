@@ -68,5 +68,11 @@ struct mt6622_platform_data {
     struct rfkill_rk_gpio   irq_gpio;
 };
 
+//leolas added support for RDA5876 BT chip
+struct tcc_bt_platform_data {
+    struct rfkill_rk_gpio   power_gpio;
+    struct rfkill_rk_gpio   wake_host_gpio;
+};
+//end leolas added support for RDA5876 BT chip
 #endif /* __RFKILL_GPIO_H */
 

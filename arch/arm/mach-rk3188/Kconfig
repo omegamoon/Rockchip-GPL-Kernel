@@ -33,19 +33,9 @@ endchoice
 menu "RK3188 Custom Tweaks"
  	depends on ARCH_RK3188 && MACH_RK3188_BOX
 
-config TCC_BT_DEV_POWER_PIN3_PD1
-	depends on TCC_BT_DEV
-	bool "Set TCC BT dev pwer to pin3 pd1"
-	default n
-
-config ACT8846_DCDC4_30V
+config IMITO_QX1
 	depends on REGULATOR_ACT8846
-	bool "Set ACT8846 DCDC4 to 3.0V"
-	default n
-
-config ACT8846_LDO6_18V
-	depends on REGULATOR_ACT8846
-	bool "Set ACT8846 LDO6 to 1.8V"
+	bool "Configure voltages for Imito QX1"
 	default n
 	
 config POWERON_LED_ENABLE
