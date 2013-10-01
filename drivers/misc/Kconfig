@@ -551,8 +551,12 @@ config TDSC8800
 config MODEM_SOUND
 	bool "modem sound control driver"
 	default n
-	
-	
+
+config TCC_BT_DEV
+	tristate "TCC Bluetooth dev Control power (RDA5876 BT chip)"
+	default n
+	help
+	  If you say Y here, you can control the power of the BT H/W Module	for RDA5876
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
