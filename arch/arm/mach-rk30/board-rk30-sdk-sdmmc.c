@@ -1034,7 +1034,12 @@ static struct rksdmmc_gpio_board rksdmmc1_gpio_init = {
 *************************************************************************/
 
 #if !defined(CONFIG_SDMMC_RK29_OLD)	
+#ifdef CONFIG_ARCH_RK30XX
+// Omegamoon: rk29_sdmmc_gpio_open was static
+void rk29_sdmmc_gpio_open(int device_id, int on)
+#else
 static void rk29_sdmmc_gpio_open(int device_id, int on)
+#endif
 {
     switch(device_id)
     {
@@ -1185,6 +1190,7 @@ static void rk29_sdmmc_gpio_open(int device_id, int on)
         break;
     }
 }
+EXPORT_SYMBOL(rk29_sdmmc_gpio_open);
 
 static void rk29_sdmmc_set_iomux_mmc0(unsigned int bus_width)
 {

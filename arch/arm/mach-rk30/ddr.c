@@ -25,6 +25,12 @@
 #include <mach/cpu.h>
 #include <plat/efuse.h>
 
+// Omegamoon: Changes to get rk30 working
+#if defined(CONFIG_ARCH_RK30)
+	#define OMEGAMOON_CHANGED	1
+#else
+	#define OMEGAMOON_CHANGED	0
+#endif
 typedef uint32_t uint32;
 
 #define ENABLE_DDR_CLOCK_GPLL_PATH  //for RK3188
@@ -3618,8 +3624,14 @@ uint32_t __sramfunc ddr_change_freq_sram(uint32_t nMHz)
 
     loops_per_us = LPJ_100MHZ*freq / 1000000;
 
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_change_freq_sram, just before set_pll \n");
+#endif
     ret=ddr_set_pll(nMHz,0);
 
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_change_freq_sram, just before ddr_get_parameter \n");
+#endif
     ddr_get_parameter(ret);
 
     /** 1. Make sure there is no host access */
@@ -3629,6 +3641,9 @@ uint32_t __sramfunc ddr_change_freq_sram(uint32_t nMHz)
     outer_flush_all();
     flush_tlb_all();
     isb();
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_change_freq_sram, just before DDR_SAVE_SP \n");
+#endif
     DDR_SAVE_SP(save_sp);
 
 #if defined(CONFIG_ARCH_RK30)
@@ -3655,6 +3670,9 @@ uint32_t __sramfunc ddr_change_freq_sram(uint32_t nMHz)
     dsb();
 
     /** 2. ddr enter self-refresh mode or precharge power-down mode */
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_change_freq_sram, just before self_refresh \n");
+#endif
    idle_port();
 #if defined(CONFIG_ARCH_RK3066B)
     ddr_set_pll_enter_3168(freq_slew);
@@ -3663,9 +3681,15 @@ uint32_t __sramfunc ddr_change_freq_sram(uint32_t nMHz)
 #endif
 
     /** 3. change frequence  */
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_change_freq_sram, just before frequency change \n");
+#endif
     ddr_set_pll(ret,1);
     ddr_freq = ret;
     
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_change_freq_sram, just before exit \n");
+#endif
     /** 5. Issues a Mode Exit command   */
 #if defined(CONFIG_ARCH_RK3066B)
     ddr_set_pll_exit_3168(freq_slew,dqstr_value);
@@ -3988,6 +4012,14 @@ int ddr_init(uint32_t dram_speed_bin, uint32_t freq)
     uint32_t gsr,dqstr;
 
     ddr_print("version 1.00 20130712 \n");
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_init(%d, %d) called...\n", dram_speed_bin, freq);	
+	ddr_print("Omegamoon >> loops_per_us is %u at this point\n", loops_per_us);
+	if (loops_per_us == 0) {
+		loops_per_us = clk_get_rate(clk_get(NULL, "ddr_pll"))/1000000;
+		ddr_print("Omegamoon >> Adjusted loops_per_us to %u\n", loops_per_us);
+	}
+#endif	
 
     mem_type = pPHY_Reg->DCR.b.DDRMD;
     ddr_speed_bin = dram_speed_bin;
@@ -4031,15 +4063,34 @@ int ddr_init(uint32_t dram_speed_bin, uint32_t freq)
                                                                     ddr_get_row(), \
                                                                     ddr_get_cs(), \
                                                                     (ddr_get_cap()>>20));
+#ifdef OMEGAMOON_CHANGED
+	//ddr_print("Omegamoon >> ddr_init called, just before ddr_adjust_config\n");
+	//ddr_adjust_config(mem_type);
+	ddr_print("Omegamoon >> ddr_init called, **SKIPPING** ddr_adjust_config\n");
+#else
     ddr_adjust_config(mem_type);
+#endif
     
-    if(ddr_rk3188_dpll_is_good == true)
-   {
+    if(ddr_rk3188_dpll_is_good == true) {
+#ifdef OMEGAMOON_CHANGED
+		/*
+		ddr_print("Omegamoon >> ddr_init called, just before ddr_change_freq\n");
+	    if(freq != 0)
+		    value=ddr_change_freq(freq);
+	    else
+		    value=ddr_change_freq(clk_get_rate(clk_get(NULL, "ddr"))/1000000);
+		*/
+		ddr_print("Omegamoon >> ddr_init called, **SKIPPING** ddr_change_freq\n");
+#else
         if(freq != 0)
             value=ddr_change_freq(freq);
         else
             value=ddr_change_freq(clk_get_rate(clk_get(NULL, "ddr"))/1000000);
+#endif
     }    
+#ifdef OMEGAMOON_CHANGED
+	ddr_print("Omegamoon >> ddr_init called, just before clk_set_rate\n");
+#endif
     clk_set_rate(clk_get(NULL, "ddr"), 0);
     ddr_print("init success!!! freq=%luMHz\n", clk_get_rate(clk_get(NULL, "ddr"))/1000000);
 

@@ -201,6 +201,9 @@ struct avs_ctr_st {
 
 
 #ifdef CONFIG_DVFS
+// Omegamoon: Added for rk30xx support
+int rk30_dvfs_init(void);
+
 /***********************************************************************************/
 int dvfs_clk_get_ref_volt(struct clk_node *dvfs_clk, int rate_khz,
 		struct cpufreq_frequency_table *clk_fv);
