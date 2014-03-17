@@ -32,6 +32,7 @@
  * Pauli Nieminen <suokkos-at-gmail-dot-com>
  */
 
+#include <linux/module.h>
 #include "drm_buffer.h"
 
 /**

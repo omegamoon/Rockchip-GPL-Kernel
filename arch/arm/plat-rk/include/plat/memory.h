@@ -15,4 +15,12 @@
 #define dmac_inv_range(start, end)	dmac_unmap_area(start, end - start, DMA_FROM_DEVICE)
 #endif
 
+/* >>> Omegamoon - Taken from sunxi linux kernel
+  define __phys_to_bus(x) (((x)>=PLAT_PHYS_OFFSET)?(x)-PLAT_PHYS_OFFSET:(x))
+  define __bus_to_phys(x) (((x)<PLAT_PHYS_OFFSET)?(x)+PLAT_PHYS_OFFSET:(x))
+  <<< Omegamoon
+*/
+#define __phys_to_bus(x) (x)
+#define __bus_to_phys(x) (x)
+
 #endif

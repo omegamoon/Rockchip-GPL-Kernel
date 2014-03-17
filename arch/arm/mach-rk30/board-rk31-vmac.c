@@ -2,23 +2,30 @@
 
 static int rk30_vmac_register_set(void)
 {
+	int val;
+	
 	//config rk30 vmac as rmii
 	writel_relaxed(0x3 << 16 | 0x2, RK30_GRF_BASE + GRF_SOC_CON1);
-	int val = readl_relaxed(RK30_GRF_BASE + GRF_IO_CON3);
+	val = readl_relaxed(RK30_GRF_BASE + GRF_IO_CON3);
 	writel_relaxed(val | 0xf << 16 | 0xf, RK30_GRF_BASE + GRF_IO_CON3);
+	
 	return 0;
 }
 
 static int rk30_rmii_io_init(void)
 {
-	int err;
+//	int err;
 
 	iomux_set(RMII_TXEN);
 	iomux_set(RMII_TXD1);
 	iomux_set(RMII_TXD0);
 	iomux_set(RMII_RXD0);
 	iomux_set(RMII_RXD1);
-	iomux_set(RMII_CLKOUT);
+#if defined (CONFIG_RK29_VMAC_EXT_CLK)      
+	iomux_set(RMII_CLKIN);
+#else
+    iomux_set(RMII_CLKOUT);
+#endif
 	iomux_set(RMII_RXERR);
 	iomux_set(RMII_CRS);
 	iomux_set(RMII_MD);
@@ -75,7 +82,11 @@ static int rk30_rmii_power_control(int enable)
 		iomux_set(RMII_TXD0);
 		iomux_set(RMII_RXD0);
 		iomux_set(RMII_RXD1);
-		iomux_set(RMII_CLKOUT);
+#if defined (CONFIG_RK29_VMAC_EXT_CLK)        
+		iomux_set(RMII_CLKIN);
+#else 
+        iomux_set(RMII_CLKOUT);
+#endif
 		iomux_set(RMII_RXERR);
 		iomux_set(RMII_CRS);
 		iomux_set(RMII_MD);
@@ -83,8 +94,11 @@ static int rk30_rmii_power_control(int enable)
 		iomux_set(GPIO3_D2);
 #if 1
 		//regulator_set_voltage(ldo_33, 3300000, 300000);
-                regulator_enable(ldo_33);
-                regulator_put(ldo_33);
+		if (ldo_33 && (!regulator_is_enabled(ldo_33))) {
+                	regulator_enable(ldo_33);
+                	regulator_put(ldo_33);
+		}
+
 		//gpio_direction_output(RK30_PIN3_PD2, GPIO_LOW);
 		gpio_set_value(RK30_PIN3_PD2, GPIO_LOW);
 		msleep(20);
@@ -97,8 +111,10 @@ static int rk30_rmii_power_control(int enable)
 #endif
 	}else {
 #if 1
-                regulator_disable(ldo_33);
-        	regulator_put(ldo_33);
+		if (ldo_33 && (regulator_is_enabled(ldo_33))) {
+                	regulator_disable(ldo_33);
+        		regulator_put(ldo_33);
+		}
 #else
 		gpio_direction_output(PHY_PWR_EN_GPIO, GPIO_LOW);
 		gpio_set_value(PHY_PWR_EN_GPIO, GPIO_LOW);
@@ -116,6 +132,7 @@ static int rk29_vmac_speed_switch(int speed)
 	} else {
 	    writel_relaxed(readl_relaxed(RK30_GRF_BASE + GRF_SOC_CON1) | ( BIT_EMAC_SPEED) | (BIT_EMAC_SPEED << 16), RK30_GRF_BASE + GRF_SOC_CON1);
 	}
+	return 0;
 }
 
 struct rk29_vmac_platform_data board_vmac_data = {

@@ -1,0 +1,3 @@
+./omegamoon/rkcrc -k ./arch/arm/boot/zImage ./kernel.img
+sudo ./omegamoon/rkflashtool w 0x00004000 0x00004000 < ./kernel.img
+sudo ./omegamoon/rkflashtool b

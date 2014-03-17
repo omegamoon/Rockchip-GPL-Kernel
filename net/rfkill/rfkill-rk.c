@@ -496,6 +496,9 @@ static int bluesleep_write_proc_btwrite(struct file *file, const char *buffer,
     return count;
 }
 
+//#define OMEGAMOON_CHANGED      1
+#undef OMEGAMOON_CHANGED
+
 static int rfkill_rk_probe(struct platform_device *pdev)
 {
 	struct rfkill_rk_data *rfkill;
@@ -504,6 +507,11 @@ static int rfkill_rk_probe(struct platform_device *pdev)
     struct proc_dir_entry *ent;
 
     DBG("Enter %s\n", __func__);
+
+#ifdef OMEGAMOON_CHANGED
+	DBG("Omegamoon >> Bailing out!");
+	return -EINVAL;
+#endif
 
 	if (!pdata) {
 		LOG("%s: No platform data specified\n", __func__);

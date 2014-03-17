@@ -27,9 +27,11 @@
 #include <linux/workqueue.h>
 #include <linux/proc_fs.h>
 #include <linux/input/mt.h>
-
+#ifdef CONFIG_MACH_RK3168_86V
+#include <rockchip_gslX680_86v.h>
+#else
 #include "rockchip_gslX680.h"
-
+#endif
 //#define GSL_DEBUG
 //#define GSL_TIMER
 #define REPORT_DATA_ANDROID_4_0

@@ -1,6 +1,3 @@
-/*$_FOR_ROCKCHIP_RBOX_$*/
-/*$_rbox_$_modify_$_huangzhibao 20120528*/
-
 /*
  * rk29_i2s.c  --  ALSA SoC ROCKCHIP IIS Audio Layer Platform driver
  *
@@ -36,11 +33,12 @@
 #include <mach/gpio.h>
 #include <mach/iomux.h>
 #include <mach/dma-pl330.h>
+#include <linux/spinlock.h>
 
 #include "rk29_pcm.h"
 #include "rk29_i2s.h"
-#include "../../../drivers/video/rockchip/hdmi/rk_hdmi.h"
 
+#define ANDROID_REC
 #if 0
 #define I2S_DBG(x...) printk(KERN_INFO x)
 #else
@@ -71,8 +69,10 @@ struct rk29_i2s_info {
 	
 	bool 	i2s_tx_status;//active = true;
 	bool 	i2s_rx_status;
+	spinlock_t spinlock_wr;//write read reg spin_lock
 };
 
+static struct snd_soc_dai *rk_cpu_dai=NULL;
 static struct rk29_dma_client rk29_dma_client_out = {
 	.name = "I2S PCM Stereo Out"
 };
@@ -92,13 +92,16 @@ static struct rk29_i2s_info rk29_i2s[MAX_I2S];
 
 struct snd_soc_dai_driver rk29_i2s_dai[MAX_I2S];
 EXPORT_SYMBOL_GPL(rk29_i2s_dai);
-
+#if defined (CONFIG_RK_HDMI) && defined (CONFIG_SND_RK_SOC_HDMI_I2S)
+extern int hdmi_get_hotplug(void);
+#endif
 /* 
  *Turn on or off the transmission path. 
  */
 static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on)
 {
 	u32 opr,xfer,clr;
+	spin_lock(&i2s->spinlock_wr);
 	opr  = readl(&(pheadi2s->I2S_DMACR));
 	xfer = readl(&(pheadi2s->I2S_XFER));
 	clr  = readl(&(pheadi2s->I2S_CLR));
@@ -117,6 +120,7 @@ static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on)
 			writel(xfer, &(pheadi2s->I2S_XFER));
 		}
 		i2s->i2s_tx_status = true;
+		spin_unlock(&i2s->spinlock_wr);
 	}
 	else
 	{
@@ -124,23 +128,32 @@ static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on)
 		i2s->i2s_tx_status = false;
 		I2S_DBG("rockchip_snd_txctrl: off\n");
 		opr  &= ~I2S_TRAN_DMA_ENABLE;        
-		writel(opr, &(pheadi2s->I2S_DMACR));  		
-		if(!i2s->i2s_tx_status && !i2s->i2s_rx_status)//sync stop i2s rx tx lcrk
+		writel(opr, &(pheadi2s->I2S_DMACR));  
+		if(!i2s->i2s_tx_status && !i2s->i2s_rx_status//sync stop i2s rx tx lcrk
+#if defined (CONFIG_RK_HDMI) && defined (CONFIG_SND_RK_SOC_HDMI_I2S)
+			&& 	hdmi_get_hotplug() == 0	//HDMI_HPD_REMOVED
+#endif			
+		)
 		{
 			xfer &= ~I2S_TX_TRAN_START;
 			xfer &= ~I2S_RX_TRAN_START;		
 			writel(xfer, &(pheadi2s->I2S_XFER));	
 			clr |= I2S_TX_CLEAR;
+			clr |= I2S_RX_CLEAR;
 			writel(clr, &(pheadi2s->I2S_CLR));
+			spin_unlock(&i2s->spinlock_wr);
 			udelay(1);
 			I2S_DBG("rockchip_snd_txctrl: stop xfer\n");			
-		}	
+		}
+		else
+			spin_unlock(&i2s->spinlock_wr);
 	}
 }
 
 static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on)
 {
 	u32 opr,xfer,clr;
+	spin_lock(&i2s->spinlock_wr);
 	opr  = readl(&(pheadi2s->I2S_DMACR));
 	xfer = readl(&(pheadi2s->I2S_XFER));
 	clr  = readl(&(pheadi2s->I2S_CLR));
@@ -159,6 +172,7 @@ static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on)
 			writel(xfer, &(pheadi2s->I2S_XFER));
 		}
 		i2s->i2s_rx_status = true;
+		spin_unlock(&i2s->spinlock_wr);
 #ifdef CONFIG_SND_SOC_RT5631
 //bard 7-16 s
 		schedule_delayed_work(&rt5631_delay_cap,HZ/4);
@@ -167,21 +181,28 @@ static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on)
 	}
 	else
 	{
-		//stop rx
 		i2s->i2s_rx_status = false;
 		I2S_DBG("rockchip_snd_rxctrl: off\n");
 		opr  &= ~I2S_RECE_DMA_ENABLE;
 		writel(opr, &(pheadi2s->I2S_DMACR));		
-		if(!i2s->i2s_tx_status && !i2s->i2s_rx_status)	//sync stop i2s rx tx lcrk
+		if(!i2s->i2s_tx_status && !i2s->i2s_rx_status	//sync stop i2s rx tx lcrk
+#if defined (CONFIG_RK_HDMI) && defined (CONFIG_SND_RK_SOC_HDMI_I2S)
+			&& 	hdmi_get_hotplug() == 0	//HDMI_HPD_REMOVED
+#endif			
+		)
 		{		
 			xfer &= ~I2S_RX_TRAN_START;
 			xfer &= ~I2S_TX_TRAN_START;		
 			writel(xfer, &(pheadi2s->I2S_XFER));		
 			clr |= I2S_RX_CLEAR;
+			clr |= I2S_TX_CLEAR;
 			writel(clr, &(pheadi2s->I2S_CLR));
+			spin_unlock(&i2s->spinlock_wr);
 			udelay(1);
 			I2S_DBG("rockchip_snd_rxctrl: stop xfer\n");				
 		}
+		else
+			spin_unlock(&i2s->spinlock_wr);
 	}
 }
 
@@ -196,7 +217,7 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
 	u32 iis_ckr_value;//clock generation register
 	
 	I2S_DBG("Enter::%s----%d\n",__FUNCTION__,__LINE__);
-
+    spin_lock(&i2s->spinlock_wr);
 	tx_ctl = readl(&(pheadi2s->I2S_TXCR));
 	iis_ckr_value = readl(&(pheadi2s->I2S_CKR));
 	
@@ -237,26 +258,10 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
 
 	rx_ctl = tx_ctl & 0x00007FFF;
 	writel(rx_ctl, &(pheadi2s->I2S_RXCR));
+    spin_unlock(&i2s->spinlock_wr);
 	return 0;
 }
 
-static int SR2FS(int samplerate){
-
-	switch(samplerate){
-        case 32000:return HDMI_AUDIO_FS_32000;
-        case 44100:return HDMI_AUDIO_FS_44100;
-        case 48000:return HDMI_AUDIO_FS_48000;
-        case 88200:return HDMI_AUDIO_FS_88200;
-        case 96000:return HDMI_AUDIO_FS_96000;
-        case 176400:return HDMI_AUDIO_FS_176400;
-        case 192000:return HDMI_AUDIO_FS_192000;
-
-        default:{
-            printk(KERN_ERR "SR2FS %d unsupport.", samplerate);
-            return HDMI_AUDIO_FS_44100;
-        }
-    }
-}
 static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params, struct snd_soc_dai *socdai)
 {
@@ -264,8 +269,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 	u32 iismod;
 	u32 dmarc;
 	u32 iis_ckr_value;//clock generation register
-	struct hdmi_audio hdmi_audio_cfg;
-	
+		
 	I2S_DBG("Enter %s, %d >>>>>>>>>>>\n", __func__, __LINE__);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
@@ -274,6 +278,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 		snd_soc_dai_set_dma_data(socdai, substream, i2s->dma_capture);
 
 	/* Working copies of register */
+    spin_lock(&i2s->spinlock_wr);
 	iismod = readl(&(pheadi2s->I2S_TXCR));
 	
 	iismod &= (~((1<<5)-1));
@@ -294,31 +299,6 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 			iismod |= I2S_DATA_WIDTH(31);
 			break;
 	}
-    iismod &= ~CHANNLE_4_EN;
-	switch (params_channels(params)) {
-		case 8:
-			iismod |= CHANNLE_4_EN;
-			break;
-		case 6:
-			iismod |= CHANNEL_3_EN;
-			break;
-		case 4:
-			iismod |= CHANNEL_2_EN;
-			break;
-		case 2:
-			iismod |= CHANNEL_1_EN;
-			break;
-		default:
-			I2S_DBG("%d channels not supported\n", params_channels(params));
-			return -EINVAL;
-	}
-    //set hdmi codec params
-    
-    hdmi_audio_cfg.channel = params_channels(params);
-    hdmi_audio_cfg.rate = SR2FS(params_rate(params));
-    hdmi_audio_cfg.type = HDMI_AUDIO_LPCM;
-    hdmi_audio_cfg.word_length = HDMI_AUDIO_WORD_LENGTH_16bit;
-	hdmi_config_audio(&hdmi_audio_cfg);
 	
 	iis_ckr_value = readl(&(pheadi2s->I2S_CKR));
 	#if defined (CONFIG_SND_RK29_CODEC_SOC_SLAVE) 
@@ -344,15 +324,9 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	iismod = iismod & 0x00007FFF;
 	writel(iismod, &(pheadi2s->I2S_RXCR));   
-
+    spin_unlock(&i2s->spinlock_wr);
 	return 0;
 }
-
-/*$_rbox_$_modify_$_huangzhibao_begin$_20120508_$*/
-#if defined(CONFIG_SND_RKXX_SOC_SPDIF)   
-extern void rk29_spdif_ctrl(int on_off, bool stopSPDIF);
-#endif
-/*$_rbox_$_modify_$_huangzhibao_end$_20120508_$*/
 
 static int rockchip_i2s_trigger(struct snd_pcm_substream *substream, int cmd, struct snd_soc_dai *dai)
 {    
@@ -415,6 +389,7 @@ static int rockchip_i2s_set_clkdiv(struct snd_soc_dai *cpu_dai,
 	i2s = to_info(cpu_dai);
         
 	//stereo mode MCLK/SCK=4  
+    spin_lock(&i2s->spinlock_wr);
 	reg = readl(&(pheadi2s->I2S_CKR));
 
 	I2S_DBG("Enter:%s, %d, div_id=0x%08X, div=0x%08X\n", __FUNCTION__, __LINE__, div_id, div);
@@ -437,58 +412,88 @@ static int rockchip_i2s_set_clkdiv(struct snd_soc_dai *cpu_dai,
 			return -EINVAL;
 	}
 	writel(reg, &(pheadi2s->I2S_CKR));
-
+    spin_unlock(&i2s->spinlock_wr);
 	return 0;
 }
 
-#ifdef CONFIG_PM
-int rockchip_i2s_suspend(struct snd_soc_dai *cpu_dai)
-{
-	I2S_DBG("Enter::%s----%d\n",__FUNCTION__,__LINE__);
-//	clk_disable(clk);
+static int i2s_set_gpio_mode(struct snd_soc_dai *dai)
+{	
+	I2S_DBG("Enter %s, %d >>>>>>>>>>>\n", __func__, __LINE__);
+    switch(dai->id) {
+#if defined(CONFIG_ARCH_RK3066B) || defined(CONFIG_ARCH_RK3188)
+        case 1:
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_MCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_LRCKRX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_LRCKTX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDI));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDO));
+            break;
+#elif defined(CONFIG_ARCH_RK30)
+        case 0:
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_MCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_LRCKRX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_LRCKTX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDI));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDO0));
+            #ifdef CONFIG_SND_I2SO_USE_EIGHT_CHANNELS
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDO1));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDO2));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDO3));
+            #endif
+			break;
+        case 1:
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S1_MCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S1_SCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S1_LRCKRX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S1_LRCKTX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S1_SDI));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S1_SDO));
+			break;
+        case 2:
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S2_MCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S2_SCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S2_LRCKRX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S2_LRCKTX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S2_SDI));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S2_SDO));
+            break;
+#endif
+#if  defined(CONFIG_ARCH_RK2928) || defined(CONFIG_ARCH_RK3026)
+        case 0:
+        #if 0 //iomux --> gps(.ko)
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_MCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SCLK));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_LRCKRX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_LRCKTX));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDI));
+            iomux_set_gpio_mode(iomux_mode_to_gpio(I2S0_SDO));
+        #endif
+        break;
+#endif
+        default:
+            I2S_DBG("Enter:%s, %d, Error For DevId!!!", __FUNCTION__, __LINE__);
+            return -EINVAL;
+    }
 	return 0;
 }
-
-int rockchip_i2s_resume(struct snd_soc_dai *cpu_dai)
-{
-	I2S_DBG("Enter::%s----%d\n",__FUNCTION__,__LINE__);
-//	clk_enable(clk);
-	return 0;
-}		
-#else
-#define rockchip_i2s_suspend NULL
-#define rockchip_i2s_resume NULL
-#endif
-
-#if defined(CONFIG_SND_RK29_SOC_alc5631) || defined(CONFIG_SND_RK29_SOC_alc5621)
-#define ROCKCHIP_I2S_RATES (SNDRV_PCM_RATE_44100)  //zyy 20110704, playback and record use same sample rate
-#else
-#define ROCKCHIP_I2S_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
-		            SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |\
-		            SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
-#endif
-
-static struct snd_soc_dai_ops rockchip_i2s_dai_ops = {
-	.trigger = rockchip_i2s_trigger,
-	.hw_params = rockchip_i2s_hw_params,
-	.set_fmt = rockchip_i2s_set_fmt,
-	.set_clkdiv = rockchip_i2s_set_clkdiv,
-	.set_sysclk = rockchip_i2s_set_sysclk,
-};
 
 static int rockchip_i2s_dai_probe(struct snd_soc_dai *dai)
 {	
 	I2S_DBG("Enter %s, %d >>>>>>>>>>>\n", __func__, __LINE__);
-	switch(dai->id) {
+    if(rk_cpu_dai == NULL)
+        rk_cpu_dai = dai;
+    switch(dai->id) {
 #if defined(CONFIG_ARCH_RK3066B) || defined(CONFIG_ARCH_RK3188)
         case 1:
-                        iomux_set(I2S0_CLK);
-                        iomux_set(I2S0_SCLK);
-                        iomux_set(I2S0_LRCLKRX);
-                        iomux_set(I2S0_LRCKTX);
-                        iomux_set(I2S0_SDI);
-                        iomux_set(I2S0_SDO);
-                        break;
+            iomux_set(I2S0_MCLK);
+            iomux_set(I2S0_SCLK);
+            iomux_set(I2S0_LRCKRX);
+            iomux_set(I2S0_LRCKTX);
+            iomux_set(I2S0_SDI);
+            iomux_set(I2S0_SDO);
+            break;
 #elif defined(CONFIG_ARCH_RK30)
         case 0:
 			rk30_mux_api_set(GPIO0A7_I2S8CHSDI_NAME, GPIO0A_I2S_8CH_SDI);		
@@ -516,11 +521,11 @@ static int rockchip_i2s_dai_probe(struct snd_soc_dai *dai)
 			rk30_mux_api_set(GPIO0D1_I2S22CHSCLK_SMCWEN_NAME, GPIO0D_I2S2_2CH_SCLK);
 			rk30_mux_api_set(GPIO0D2_I2S22CHLRCKRX_SMCOEN_NAME, GPIO0D_I2S2_2CH_LRCK_RX);
 			rk30_mux_api_set(GPIO0D3_I2S22CHLRCKTX_SMCADVN_NAME, GPIO0D_I2S2_2CH_LRCK_TX);				
-            		rk30_mux_api_set(GPIO0D4_I2S22CHSDI_SMCADDR0_NAME, GPIO0D_I2S2_2CH_SDI);
-            		rk30_mux_api_set(GPIO0D5_I2S22CHSDO_SMCADDR1_NAME, GPIO0D_I2S2_2CH_SDO);
-           		break;				
+			rk30_mux_api_set(GPIO0D4_I2S22CHSDI_SMCADDR0_NAME, GPIO0D_I2S2_2CH_SDI);
+			rk30_mux_api_set(GPIO0D5_I2S22CHSDO_SMCADDR1_NAME, GPIO0D_I2S2_2CH_SDO);
+			break;
 #endif
-#ifdef CONFIG_ARCH_RK2928
+#if  defined(CONFIG_ARCH_RK2928) || defined(CONFIG_ARCH_RK3026)
         case 0:
         #if 0 //iomux --> gps(.ko)
                 rk30_mux_api_set(GPIO1A0_I2S_MCLK_NAME, GPIO1A_I2S_MCLK);
@@ -530,14 +535,49 @@ static int rockchip_i2s_dai_probe(struct snd_soc_dai *dai)
                 rk30_mux_api_set(GPIO1A4_I2S_SDO_GPS_MAG_NAME, GPIO1A_I2S_SDO);
                 rk30_mux_api_set(GPIO1A5_I2S_SDI_GPS_SIGN_NAME, GPIO1A_I2S_SDI);
         #endif
-                break;
+		break;
 #endif
         default:
             I2S_DBG("Enter:%s, %d, Error For DevId!!!", __FUNCTION__, __LINE__);
             return -EINVAL;
-        }
+    }
 	return 0;
 }
+
+#ifdef CONFIG_PM
+int rockchip_i2s_suspend(struct snd_soc_dai *cpu_dai)
+{
+	I2S_DBG("Enter::%s----%d\n",__FUNCTION__,__LINE__);
+//	clk_disable(clk);
+	return 0;
+}
+
+int rockchip_i2s_resume(struct snd_soc_dai *cpu_dai)
+{
+	I2S_DBG("Enter::%s----%d\n",__FUNCTION__,__LINE__);
+//	clk_enable(clk);
+	return 0;
+}
+#else
+#define rockchip_i2s_suspend NULL
+#define rockchip_i2s_resume NULL
+#endif
+
+#ifdef ANDROID_REC
+#define ROCKCHIP_I2S_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
+#else
+#define ROCKCHIP_I2S_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
+		            SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |\
+		            SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
+#endif
+
+static struct snd_soc_dai_ops rockchip_i2s_dai_ops = {
+	.trigger = rockchip_i2s_trigger,
+	.hw_params = rockchip_i2s_hw_params,
+	.set_fmt = rockchip_i2s_set_fmt,
+	.set_clkdiv = rockchip_i2s_set_clkdiv,
+	.set_sysclk = rockchip_i2s_set_sysclk,
+};
 
 static int rk29_i2s_probe(struct platform_device *pdev,
 			  struct snd_soc_dai_driver *dai,
@@ -601,8 +641,18 @@ static int __devinit rockchip_i2s_probe(struct platform_device *pdev)
 	struct snd_soc_dai_driver *dai;
 	int    ret;
 
-	I2S_DBG("Enter %s, %d pdev->id = %d >>>>>>>>>>>\n", __func__, __LINE__, pdev->id);
+#if defined(CONFIG_SND_I2S_USE_18V)	
+	writel_relaxed(0x2000200,RK30_GRF_BASE + GRF_IO_CON4);//bit9: 1,1.8v;0,3.3v
+#elif defined(CONFIG_SND_I2S_USE_33V)
+	writel_relaxed(0x2000000,RK30_GRF_BASE + GRF_IO_CON4);
+#endif
 
+#if defined(CONFIG_ARCH_RK3066B) || defined(CONFIG_ARCH_RK3188)
+	//default 8ma  0xF000F = 12ma 0xF0005=4ma 0xF0000=2ma
+	writel_relaxed(0xF000A,RK30_GRF_BASE + GRF_IO_CON1);
+#endif	
+	I2S_DBG("Enter %s, %d pdev->id = %d >>>>>>>>>>>\n", __func__, __LINE__, pdev->id);
+	
 	if(pdev->id >= MAX_I2S) {
 		dev_err(&pdev->dev, "id %d out of range\n", pdev->id);
 		return -EINVAL;        
@@ -632,11 +682,13 @@ static int __devinit rockchip_i2s_probe(struct platform_device *pdev)
 		break;
 	}	
 
-	dai->playback.rates = ROCKCHIP_I2S_RATES;
-	dai->playback.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | SNDRV_PCM_FMTBIT_S24_LE;
+	spin_lock_init(&i2s->spinlock_wr);
+	dai->playback.rates = SNDRV_PCM_RATE_8000_192000;
+	dai->playback.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |
+		SNDRV_PCM_FMTBIT_S24_LE| SNDRV_PCM_FMTBIT_S32_LE;
 	dai->capture.channels_min = 2;
 	dai->capture.channels_max = 2;
-	dai->capture.rates = SNDRV_PCM_RATE_44100;//ROCKCHIP_I2S_RATES;//;SNDRV_PCM_RATE_44100
+	dai->capture.rates = ROCKCHIP_I2S_RATES;
 	dai->capture.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | SNDRV_PCM_FMTBIT_S24_LE;
 	dai->probe = rockchip_i2s_dai_probe; 
 	dai->ops = &rockchip_i2s_dai_ops;
@@ -676,7 +728,7 @@ static int __devinit rockchip_i2s_probe(struct platform_device *pdev)
 		i2s->dma_playback->dma_addr = RK30_I2S1_2CH_PHYS + I2S_TXR_BUFF;
 		break;
 #endif
-#ifdef CONFIG_ARCH_RK2928
+#if defined(CONFIG_ARCH_RK2928) || defined(CONFIG_ARCH_RK3026)
 	case 0:
 		i2s->dma_capture->channel = DMACH_I2S0_8CH_RX;
 		i2s->dma_capture->dma_addr = RK2928_I2S_PHYS + I2S_RXR_BUFF;
@@ -693,13 +745,11 @@ static int __devinit rockchip_i2s_probe(struct platform_device *pdev)
 	i2s->dma_playback->dma_size = 4;
 	i2s->dma_playback->flag = 0;			//add by sxj, used for burst change
 	i2s->i2s_tx_status = false;	
-	i2s->i2s_rx_status = false;		
-/*$_rbox_$_modify_$_huangzhibao_begin$_20120505_$_remane CONFIG_SND_DMA_EVENT_STATIC*/		
-#ifdef CONFIG_SND_DMA_EVENT_STATIC
+	i2s->i2s_rx_status = false;	
+#ifdef CONFIG_SND_I2S_DMA_EVENT_STATIC
 	 WARN_ON(rk29_dma_request(i2s->dma_playback->channel, i2s->dma_playback->client, NULL));
 	 WARN_ON(rk29_dma_request(i2s->dma_capture->channel, i2s->dma_capture->client, NULL));
 #endif
-/*$_rbox_$_modify_$_huangzhibao_end$_20120505_$*/	
 
 	i2s->iis_clk = clk_get(&pdev->dev, "i2s");
 	I2S_DBG("Enter:%s, %d, iis_clk=%p\n", __FUNCTION__, __LINE__, i2s->iis_clk);
@@ -719,21 +769,6 @@ static int __devinit rockchip_i2s_probe(struct platform_device *pdev)
 	ret = snd_soc_register_dai(&pdev->dev, dai);
 	if (ret != 0)
 		goto err_i2sv2;
-#if 0
-		writel(0x0000000F, &(pheadi2s->I2S_TXCR));
-		writel(0x0000000F, &(pheadi2s->I2S_RXCR));
-		writel(0x00071f1F, &(pheadi2s->I2S_CKR));
-		writel(0x001F0110, &(pheadi2s->I2S_DMACR));
-		writel(0x00000003, &(pheadi2s->I2S_XFER));
-		while(1)
-		{
-			writel(0x5555aaaa, &(pheadi2s->I2S_TXDR));
-		//	msleep(1);
-		//	printk("-----------------------\n");
-		}		
-#endif
-	
-
 
 	return 0;
 
@@ -744,6 +779,27 @@ err_clk:
 err:
 	return ret;
 }
+
+static int rockchip_i2s_suspend_noirq(struct device *dev)
+{
+    struct snd_soc_dai *dai = rk_cpu_dai;
+    I2S_DBG("Enter %s, %d\n", __func__, __LINE__);
+
+	return i2s_set_gpio_mode(dai);
+}
+
+static int rockchip_i2s_resume_noirq(struct device *dev)
+{
+    struct snd_soc_dai *dai = rk_cpu_dai;
+    I2S_DBG("Enter %s, %d\n", __func__, __LINE__);
+
+	return rockchip_i2s_dai_probe(dai);
+}
+
+static const struct dev_pm_ops rockchip_i2s_pm_ops = {
+	.suspend_noirq = rockchip_i2s_suspend_noirq,
+	.resume_noirq = rockchip_i2s_resume_noirq,
+};
 
 static int __devexit rockchip_i2s_remove(struct platform_device *pdev)
 {
@@ -757,6 +813,7 @@ static struct platform_driver rockchip_i2s_driver = {
 	.driver = {
 		.name   = "rk29_i2s",
 		.owner  = THIS_MODULE,
+		.pm	= &rockchip_i2s_pm_ops,
 	},
 };
 
@@ -803,13 +860,50 @@ static int proc_i2s_show(struct seq_file *s, void *v)
 	printk("I2S_INTCR = 0x%08X\n", readl(&(pheadi2s->I2S_INTCR)));
 	printk("I2S_INTSR = 0x%08X\n", readl(&(pheadi2s->I2S_INTSR)));
 	printk("I2S_XFER = 0x%08X\n", readl(&(pheadi2s->I2S_XFER)));
-    printk("I2S_FIFOLR = 0x%08X\n", readl(&(pheadi2s->I2S_FIFOLR)));
-    printk("I2S_CLR = 0x%08X\n", readl(&(pheadi2s->I2S_CLR)));
-    printk("I2S_TXDR = 0x%08X\n", readl(&(pheadi2s->I2S_TXDR)));
-    printk("I2S_RXDR = 0x%08X\n", readl(&(pheadi2s->I2S_RXDR)));
 
 	printk("========Show I2S reg========\n");
+#if 0
+		writel(0x0000000F, &(pheadi2s->I2S_TXCR));
+		writel(0x0000000F, &(pheadi2s->I2S_RXCR));
+		writel(0x00071f1F, &(pheadi2s->I2S_CKR));
+		writel(0x001F0110, &(pheadi2s->I2S_DMACR));
+		writel(0x00000003, &(pheadi2s->I2S_XFER));
+		while(1)
+		{
+			writel(0x5555aaaa, &(pheadi2s->I2S_TXDR));
+		}		
+#endif	
 	return 0;
+}
+
+static ssize_t i2s_reg_write(struct file *file,
+		const char __user *user_buf, size_t count, loff_t *ppos)
+{
+#ifdef CONFIG_SND_RK29_SOC_I2S_8CH
+	struct rk29_i2s_info *i2s=&rk29_i2s[0];
+#else 
+#ifdef CONFIG_SND_RK29_SOC_I2S_2CH
+	struct rk29_i2s_info *i2s=&rk29_i2s[1];
+#else
+	struct rk29_i2s_info *i2s=&rk29_i2s[2];
+#endif
+#endif
+	char buf[32];
+	size_t buf_size;
+	char *start = buf;
+	unsigned long value;
+
+	buf_size = min(count, (sizeof(buf)-1));
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+	buf[buf_size] = 0;
+
+	while (*start == ' ')
+		start++;
+	value = simple_strtoul(start, &start, 10);
+
+	printk("test --- freq = %ld ret=%d\n",value,clk_set_rate(i2s->iis_clk, value));
+	return buf_size;
 }
 
 static int proc_i2s_open(struct inode *inode, struct file *file)
@@ -820,6 +914,7 @@ static int proc_i2s_open(struct inode *inode, struct file *file)
 static const struct file_operations proc_i2s_fops = {
 	.open		= proc_i2s_open,
 	.read		= seq_read,
+	.write = i2s_reg_write,	
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };

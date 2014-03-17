@@ -665,6 +665,8 @@ static void atom_op_delay(atom_exec_context *ctx, int *ptr, int arg)
 	SDEBUG("   count: %d\n", count);
 	if (arg == ATOM_UNIT_MICROSEC)
 		udelay(count);
+	else if (!drm_can_sleep())
+		mdelay(count);
 	else
 		msleep(count);
 }
@@ -1220,12 +1222,17 @@ int atom_execute_table(struct atom_context *ctx, int index, uint32_t * params)
 	int r;
 
 	mutex_lock(&ctx->mutex);
+	/* reset data block */
+	ctx->data_block = 0;
 	/* reset reg block */
 	ctx->reg_block = 0;
 	/* reset fb window */
 	ctx->fb_base = 0;
 	/* reset io mode */
 	ctx->io_mode = ATOM_IO_MM;
+	/* reset divmul */
+	ctx->divmul[0] = 0;
+	ctx->divmul[1] = 0;
 	r = atom_execute_table_locked(ctx, index, params);
 	mutex_unlock(&ctx->mutex);
 	return r;
@@ -1253,6 +1260,9 @@ struct atom_context *atom_parse(struct card_info *card, void *bios)
 	char *str;
 	char name[512];
 	int i;
+
+	if (!ctx)
+		return NULL;
 
 	ctx->card = card;
 	ctx->bios = bios;
@@ -1384,10 +1394,10 @@ int atom_allocate_fb_scratch(struct atom_context *ctx)
 		firmware_usage = (struct _ATOM_VRAM_USAGE_BY_FIRMWARE *)(ctx->bios + data_offset);
 
 		DRM_DEBUG("atom firmware requested %08x %dkb\n",
-			  firmware_usage->asFirmwareVramReserveInfo[0].ulStartAddrUsedByFirmware,
-			  firmware_usage->asFirmwareVramReserveInfo[0].usFirmwareUseInKb);
+			  le32_to_cpu(firmware_usage->asFirmwareVramReserveInfo[0].ulStartAddrUsedByFirmware),
+			  le16_to_cpu(firmware_usage->asFirmwareVramReserveInfo[0].usFirmwareUseInKb));
 
-		usage_bytes = firmware_usage->asFirmwareVramReserveInfo[0].usFirmwareUseInKb * 1024;
+		usage_bytes = le16_to_cpu(firmware_usage->asFirmwareVramReserveInfo[0].usFirmwareUseInKb) * 1024;
 	}
 	ctx->scratch_size_bytes = 0;
 	if (usage_bytes == 0)

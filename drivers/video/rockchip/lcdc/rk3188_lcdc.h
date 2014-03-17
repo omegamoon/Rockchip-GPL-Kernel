@@ -16,7 +16,7 @@
 #define m_WIN1_FORMAT		(7<<6)
 #define m_HWC_COLOR_MODE	(1<<9)
 #define m_HWC_SIZE		(1<<10)
-#define m_WIN0_3D_EN		(1<11)
+#define m_WIN0_3D_EN		(1<<11)
 #define m_WIN0_3D_MODE		(7<<12)
 #define m_WIN0_RB_SWAP		(1<<15)
 #define m_WIN0_ALPHA_SWAP	(1<<16)
@@ -41,7 +41,7 @@
 #define v_WIN1_FORMAT(x)	(((x)&7)<<6)
 #define v_HWC_COLOR_MODE(x)	(((x)&1)<<9)
 #define v_HWC_SIZE(x)		(((x)&1)<<10)
-#define v_WIN0_3D_EN(x)		(((x)&1)<11)
+#define v_WIN0_3D_EN(x)		(((x)&1)<<11)
 #define v_WIN0_3D_MODE(x)	(((x)&7)<<12)
 #define v_WIN0_RB_SWAP(x)	(((x)&1)<<15)
 #define v_WIN0_ALPHA_SWAP(x)	(((x)&1)<<16)
@@ -183,7 +183,7 @@
 #define m_FS_INT_CLEAR		(1<<9)
 #define m_LF_INT_CLEAR		(1<<10)
 #define m_BUS_ERR_INT_CLEAR	(1<<11)
-#define m_LINE_FLAG_NUM		(0xfff<<12)
+#define m_LF_INT_NUM		(0xfff<<12)
 #define v_HS_INT_EN(x)		(((x)&1)<<4)
 #define v_FS_INT_EN(x)		(((x)&1)<<5)
 #define v_LF_INT_EN(x)		(((x)&1)<<6)
@@ -192,7 +192,7 @@
 #define v_FS_INT_CLEAR(x)	(((x)&1)<<9)
 #define v_LF_INT_CLEAR(x)	(((x)&1)<<10)
 #define v_BUS_ERR_INT_CLEAR(x)	(((x)&1)<<11)
-#define v_LINE_FLAG_NUM(x)	(((x)&0xfff)<<12)
+#define v_LF_INT_NUM(x)		(((x)&0xfff)<<12)
 
 
 #define ALPHA_CTRL		(0x14)
@@ -225,6 +225,8 @@
 #define WIN_VIR			(0x30)
 #define m_WIN0_VIR   		(0x1fff << 0)
 #define m_WIN1_VIR   		(0x1fff << 16)
+#define v_WIN0_VIR_VAL(x)       ((x)<<0)
+#define v_WIN1_VIR_VAL(x)       ((x)<<16)
 #define v_ARGB888_VIRWIDTH(x) 	(((x)&0x1fff)<<0)
 #define v_RGB888_VIRWIDTH(x) 	(((((x*3)>>2)+((x)%3))&0x1fff)<<0)
 #define v_RGB565_VIRWIDTH(x) 	 ((DIV_ROUND_UP(x,2)&0x1fff)<<0)
@@ -232,7 +234,11 @@
 #define v_WIN1_ARGB888_VIRWIDTH(x) 	(((x)&0x1fff)<<16)
 #define v_WIN1_RGB888_VIRWIDTH(x) 	(((((x*3)>>2)+((x)%3))&0x1fff)<<16)
 #define v_WIN1_RGB565_VIRWIDTH(x) 	 ((DIV_ROUND_UP(x,2)&0x1fff)<<16)
-
+// >>> Omegamoon - TODO, Dunno about this; needs fixing!
+#define v_WIN2_ARGB888_VIRWIDTH(x) 	(((x)&0x1fff)<<16)
+#define v_WIN2_RGB888_VIRWIDTH(x) 	(((((x*3)>>2)+((x)%3))&0x1fff)<<16)
+#define v_WIN2_RGB565_VIRWIDTH(x) 	 ((DIV_ROUND_UP(x,2)&0x1fff)<<16)
+// <<< Omegamoon
 
 
 #define WIN0_ACT_INFO		(0x34)
@@ -286,6 +292,34 @@
 #define WIN1_LUT_ADDR		(0x400)
 #define DSP_LUT_ADDR		(0x800)
 
+/*
+	RK3026/RK3028A max output  resolution 1920x1080
+	support IEP instead of  3d
+*/
+//#ifdef CONFIG_ARCH_RK3026
+//SYS_CTRL 0x00
+#define m_DIRECT_PATCH_EN         (1<<11)
+#define m_DIRECT_PATH_LAY_SEL     (1<<12)
+
+#define v_DIRECT_PATCH_EN(x)      (((x)&1)<<11)
+#define v_DIRECT_PATH_LAY_SEL(x)  (((x)&1)<<12)
+
+//INT_STATUS 0x10
+#define m_WIN0_EMPTY_INTR_EN      (1<<24)
+#define m_WIN1_EMPTY_INTR_EN      (1<<25)
+#define m_WIN0_EMPTY_INTR_CLR     (1<<26)
+#define m_WIN1_EMPTY_INTR_CLR     (1<<27)
+#define m_WIN0_EMPTY_INTR_STA     (1<<28)
+#define m_WIN1_EMPTY_INTR_STA     (1<<29)
+
+#define v_WIN0_EMPTY_INTR_EN(x)   (((x)&1)<<24)
+#define v_WIN1_EMPTY_INTR_EN(x)   (((x)&1)<<25)
+#define v_WIN0_EMPTY_INTR_CLR(x)  (((x)&1)<<26)
+#define v_WIN1_EMPTY_INTR_CLR(x)  (((x)&1)<<27)
+#define v_WIN0_EMPTY_INTR_STA(x)  (((x)&1)<<28)
+#define v_WIN1_EMPTY_INTR_STA(x)  (((x)&1)<<29)
+//#endif
+
 
 #define CalScale(x, y)	             ((((u32)(x-1))*0x1000)/(y-1))
 
@@ -313,7 +347,9 @@ struct rk3188_lcdc_device{
 	struct clk		*hclk;				//lcdc AHP clk
 	struct clk		*dclk;				//lcdc dclk
 	struct clk		*aclk;				//lcdc share memory frequency
-	u32 pixclock;				
+	u32 pixclock;	
+
+	u32 standby;						//1:standby,0:wrok
 };
 
 
@@ -328,14 +364,19 @@ static inline void lcdc_writel(struct rk3188_lcdc_device *lcdc_dev,u32 offset,u3
 
 static inline u32 lcdc_readl(struct rk3188_lcdc_device *lcdc_dev,u32 offset)
 {
-	return readl_relaxed(lcdc_dev->regs+offset);
+	u32 v;
+	u32 *_pv = (u32*)lcdc_dev->regsbak;
+	_pv += (offset >> 2);
+	v = readl_relaxed(lcdc_dev->regs+offset);
+	*_pv = v;
+	return v;
 }
 
 static inline u32 lcdc_read_bit(struct rk3188_lcdc_device *lcdc_dev,u32 offset,u32 msk) 
 {
        u32 _v = readl_relaxed(lcdc_dev->regs+offset); 
        _v &= msk;
-       return (_v >> msk);   
+       return (_v?1:0);   
 }
 
 static inline void  lcdc_set_bit(struct rk3188_lcdc_device *lcdc_dev,u32 offset,u32 msk) 
@@ -366,7 +407,7 @@ static inline void  lcdc_msk_reg(struct rk3188_lcdc_device *lcdc_dev,u32 offset,
 static inline void lcdc_cfg_done(struct rk3188_lcdc_device *lcdc_dev) 
 {
 	writel_relaxed(0x01,lcdc_dev->regs+REG_CFG_DONE); 
-	dsb();						
+	dsb();	
 } 
 
 #endif

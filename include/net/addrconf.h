@@ -8,7 +8,7 @@
 
 #define TEMP_VALID_LIFETIME		(7*86400)
 #define TEMP_PREFERRED_LIFETIME		(86400)
-#define REGEN_MAX_RETRY			(3)
+#define REGEN_MAX_RETRY			(5)
 #define MAX_DESYNC_FACTOR		(600)
 
 #define ADDR_CHECK_FREQUENCY		(120*HZ)
@@ -81,6 +81,9 @@ extern int			ipv6_dev_get_saddr(struct net *net,
 					       const struct in6_addr *daddr,
 					       unsigned int srcprefs,
 					       struct in6_addr *saddr);
+extern int			__ipv6_get_lladdr(struct inet6_dev *idev,
+						  struct in6_addr *addr,
+						  unsigned char banned_flags);
 extern int			ipv6_get_lladdr(struct net_device *dev,
 						struct in6_addr *addr,
 						unsigned char banned_flags);

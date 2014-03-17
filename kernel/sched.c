@@ -2744,8 +2744,10 @@ static void try_to_wake_up_local(struct task_struct *p)
 {
 	struct rq *rq = task_rq(p);
 
-	BUG_ON(rq != this_rq());
-	BUG_ON(p == current);
+	if (WARN_ON_ONCE(rq != this_rq()) ||
+	    WARN_ON_ONCE(p == current))
+		return;
+
 	lockdep_assert_held(&rq->lock);
 
 	if (!raw_spin_trylock(&p->pi_lock)) {
@@ -7951,7 +7953,7 @@ static void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq)
 #ifdef CONFIG_SMP
 	rt_rq->rt_nr_migratory = 0;
 	rt_rq->overloaded = 0;
-	plist_head_init(&rt_rq->pushable_tasks);
+	plist_head_init_raw(&rt_rq->pushable_tasks, &rq->lock);
 #endif
 
 	rt_rq->rt_time = 0;
@@ -8156,7 +8158,7 @@ void __init sched_init(void)
 #endif
 
 #ifdef CONFIG_RT_MUTEXES
-	plist_head_init(&init_task.pi_waiters);
+	plist_head_init_raw(&init_task.pi_waiters, &init_task.pi_lock);
 #endif
 
 	/*

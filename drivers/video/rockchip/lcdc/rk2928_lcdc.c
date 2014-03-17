@@ -33,7 +33,7 @@
 #include <mach/iomux.h>
 #include <mach/gpio.h>
 #include "rk2928_lcdc.h"
-#include "../lvds/rk_lvds.h"
+#include "../transmitter/rk2928_lvds.h"
 
 
 
@@ -293,7 +293,7 @@ static int rk2928_load_screen(struct rk_lcdc_device_driver *dev_drv, bool initsc
 	}
  	spin_unlock(&lcdc_dev->reg_lock);
 
-#ifdef CONFIG_RK_LVDS
+#ifdef CONFIG_RK2928_LVDS
 	rk_lvds_register(dev_drv->screen0);
 #endif
 	if(dev_drv->screen0->type == SCREEN_RGB) //iomux for RGB screen
@@ -361,7 +361,7 @@ static int rk2928_load_screen(struct rk_lcdc_device_driver *dev_drv, bool initsc
 		{
 	        	printk(KERN_ERR ">>>>>> set lcdc%d sclk failed\n",lcdc_dev->id);
 		}
-		lcdc_dev->driver.pixclock = lcdc_dev->pixclock = div_u64(1000000000000llu, clk_get_rate(lcdc_dev->sclk));
+		//lcdc_dev->driver.pixclock = lcdc_dev->pixclock = div_u64(1000000000000llu, clk_get_rate(lcdc_dev->sclk));
 		//printk("%s: sclk:%lu>>need:%d",lcdc_dev->driver.name,,screen0->s_pixclock);
 		clk_enable(lcdc_dev->sclk);
 	}
@@ -658,22 +658,27 @@ static int win1_set_par(struct rk2928_lcdc_device *lcdc_dev,rk_screen *screen,
 		switch(par->format)
 	       {	
 			case XBGR888:
+                		fmt_cfg = 0;
 				LcdMskReg(lcdc_dev,WIN_VIR,m_WIN1_VIR,v_WIN1_ARGB888_VIRWIDTH(xvir));
 				LcdMskReg(lcdc_dev,SYS_CFG,m_W1_RGB_RB_SWAP,v_W1_RGB_RB_SWAP(1));
 				break;
 			case ABGR888:
+                		fmt_cfg = 0;
 				LcdMskReg(lcdc_dev,WIN_VIR,m_WIN1_VIR,v_WIN1_ARGB888_VIRWIDTH(xvir));
 				LcdMskReg(lcdc_dev,SYS_CFG,m_W1_RGB_RB_SWAP,v_W1_RGB_RB_SWAP(1));
 				break;
 			case ARGB888:
+                		fmt_cfg = 0;
 				LcdMskReg(lcdc_dev,WIN_VIR,m_WIN1_VIR,v_WIN1_ARGB888_VIRWIDTH(xvir));
 				LcdMskReg(lcdc_dev,SYS_CFG,m_W1_RGB_RB_SWAP,v_W1_RGB_RB_SWAP(0));
 				break;
 			case RGB888:  //rgb888
+                		fmt_cfg = 1;
 				LcdMskReg(lcdc_dev,WIN_VIR,m_WIN1_VIR,v_WIN1_RGB888_VIRWIDTH(xvir));
 				LcdMskReg(lcdc_dev,DSP_CTRL,m_W1_RGB_RB_SWAP,v_W1_RGB_RB_SWAP(0));
 				break;
 			case RGB565:  //rgb565
+                		fmt_cfg = 2;
 				LcdMskReg(lcdc_dev,WIN_VIR,m_WIN1_VIR,v_WIN1_RGB565_VIRWIDTH(xvir));
 				LcdMskReg(lcdc_dev,SYS_CFG,m_W1_RGB_RB_SWAP,v_W1_RGB_RB_SWAP(0));
 				break;
@@ -734,7 +739,15 @@ static int rk2928_lcdc_set_par(struct rk_lcdc_device_driver *dev_drv,int layer_i
         	win1_set_par(lcdc_dev,screen,par);
 	}
 	Scl_X = CalScale(screen->x_res - 1,screen0->x_res - 1);
-	Scl_Y = CalScale(screen->y_res - 1 ,screen0->y_res - 1);
+	if((screen->y_res-1)/(screen0->x_res -1) < 2)
+	{
+
+		Scl_Y = CalScale(screen->y_res - 1 ,screen0->y_res - 1);
+	}
+	else
+	{	
+		Scl_Y = CalScale(screen->y_res - 2 ,screen0->y_res - 1);
+	}
 	LcdWrReg(lcdc_dev,SCL_REG1,v_SCL_V_FACTOR(Scl_Y)|v_SCL_H_FACTOR(Scl_X));
 	
 	return 0;
@@ -1049,6 +1062,7 @@ static int rk2928_fb_get_layer(struct rk_lcdc_device_driver *dev_drv,const char 
 
 static int rk2928_lcdc_hdmi_process(struct rk_lcdc_device_driver *dev_drv,int mode)
 {
+#if !defined(CONFIG_ONE_LCDC_DUAL_OUTPUT_INF)
 	printk("%s>>>>>>>>mode:%d\n",__func__,mode);
 	if(mode)
 	{
@@ -1062,6 +1076,7 @@ static int rk2928_lcdc_hdmi_process(struct rk_lcdc_device_driver *dev_drv,int mo
 		if(dev_drv->screen_ctr_info->io_enable)
 			dev_drv->screen_ctr_info->io_enable();
 	}
+#endif
 	
 	return 0;
 	
@@ -1367,7 +1382,7 @@ static void rk2928_lcdc_shutdown(struct platform_device *pdev)
 		lcdc_dev->driver.screen_ctr_info->io_disable();
 	if(lcdc_dev->driver.cur_screen->sscreen_set) //turn off  lvds
 		lcdc_dev->driver.cur_screen->sscreen_set(lcdc_dev->driver.cur_screen , 0);
-	rk_fb_unregister(&(lcdc_dev->driver));
+	//rk_fb_unregister(&(lcdc_dev->driver));
 	rk2928_lcdc_deinit(lcdc_dev);
 	/*iounmap(lcdc_dev->reg_vir_base);
 	release_mem_region(lcdc_dev->reg_phy_base,lcdc_dev->len);

@@ -552,7 +552,11 @@ config MODEM_SOUND
 	bool "modem sound control driver"
 	default n
 	
-	
+config TCC_BT_DEV
+	tristate "TCC Bluetooth dev Control power"
+	default n
+	help
+	  If you say Y here, you can contorl the power of the BT H/W Module
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

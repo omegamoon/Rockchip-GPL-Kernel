@@ -33,17 +33,12 @@
 #include <linux/mma8452.h>
 #include <linux/sensor-dev.h>
 
-#if 0
-#define SENSOR_DEBUG_TYPE SENSOR_TYPE_ACCEL
-#define DBG(x...) if(sensor->pdata->type == SENSOR_DEBUG_TYPE) printk(x)
-#else
-#define DBG(x...)
-#endif
 
 
 #define MMA8451_DEVID		0x1a
 #define MMA8452_DEVID		0x2a
 #define MMA8453_DEVID		0x3a
+#define MMA8653_DEVID		0x5a
 
 #define MMA8452_ENABLE		1
 
@@ -158,6 +153,7 @@ static int sensor_convert_data(struct i2c_client *client, char high_byte, char l
 			break;
 			
 		case MMA8453_DEVID:		
+		case MMA8653_DEVID:	
 			swap(high_byte,low_byte);
 			result = ((int)high_byte << (MMA8453_PRECISION-8)) 
 					| ((int)low_byte >> (16-MMA8453_PRECISION));
@@ -260,8 +256,13 @@ struct sensor_operate gsensor_mma8452_ops = {
 	.read_reg			= MMA8452_REG_X_OUT_MSB,		//read data
 	.read_len			= 6,					//data length
 	.id_reg				= MMA8452_REG_WHO_AM_I,			//read device id from this register
-	.id_data 			= MMA8452_DEVID,			//device id
+	#if defined(CONFIG_GS_MMA8653)
+	.id_data 			= MMA8653_DEVID,//MMA8452_DEVID,			//device id
+	.precision			= MMA8453_PRECISION,			//12 bit
+	#else 
+	.id_data 			= MMA8452_DEVID,//MMA8452_DEVID,			//device id
 	.precision			= MMA8452_PRECISION,			//12 bit
+	#endif 
 	.ctrl_reg 			= MMA8452_REG_CTRL_REG1,		//enable or disable 	
 	.int_status_reg 		= MMA8452_REG_INTSRC,			//intterupt status register
 	.range				= {-MMA845X_RANGE,MMA845X_RANGE},	//range
@@ -286,7 +287,6 @@ static int __init gsensor_mma8452_init(void)
 	int result = 0;
 	int type = ops->type;
 	result = sensor_register_slave(type, NULL, NULL, gsensor_get_ops);	
-	DBG("%s\n",__func__);
 	return result;
 }
 

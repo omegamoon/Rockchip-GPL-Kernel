@@ -1,5 +1,3 @@
-##$_FOR_ROCKCHIP_RBOX_$
-
 config SND_RK29_SOC
 	tristate "SoC Audio for the Rockchip System-on-Chip"
 	depends on PLAT_RK && SND_SOC
@@ -11,12 +9,15 @@ config SND_RK29_SOC
 config SND_RK29_SOC_I2S
 	tristate
 
+config SND_RK_SOC_SPDIF
+	tristate
+
 config SND_RK29_SOC_I2S_8CH
-        bool "Soc RK29 I2S 8 Channel support(I2S0)"
-        default y
+	bool "Soc RK29 I2S 8 Channel support(I2S0)"
+	default y
 	depends on SND_RK29_SOC_I2S && !ARCH_RK3066B && !ARCH_RK3188
 	help
-                This supports the use of the 8 Channel I2S interface on rk29 processors.
+       This supports the use of the 8 Channel I2S interface on rk29 processors.
 				
 if SND_RK29_SOC_I2S_8CH
 choice
@@ -31,49 +32,76 @@ endchoice
 endif
 
 config SND_RK29_SOC_I2S_2CH
-        bool "Soc RK29 I2S 2 Channel support(I2S1)"
-        default n
-	depends on SND_RK29_SOC_I2S && !ARCH_RK2928
+	bool "Soc RK29 I2S 2 Channel support(I2S1)"
+	depends on SND_RK29_SOC_I2S && !ARCH_RK2928 && !ARCH_RK3026
+	default y if (ARCH_RK3066B || ARCH_RK3188)
 	help
-                This supports the use of the 2 Channel I2S interface on rk29 processors.
+         This supports the use of the 2 Channel I2S interface on rk29 processors.
+		 
+choice
+	bool "Set I2S GRF Output Voltage"
+	depends on (ARCH_RK3066B || ARCH_RK3188) && SND_RK29_SOC_I2S_2CH
+	default SND_I2S_USE_33V
+
+	config SND_I2S_USE_33V
+		bool "I2S use 3.3V"
+
+	config SND_I2S_USE_18V
+		bool "I2S use 1.8V"
+endchoice
 
 config SND_RK_SOC_I2S2_2CH
 	bool "Soc RK29 I2S 2 Channel support(I2S2)"
 	default n
-	depends on SND_RK29_SOC_I2S && ARCH_RK30 && !ARCH_RK2928 && !ARCH_RK3066B
+	depends on SND_RK29_SOC_I2S && ARCH_RK30 && !ARCH_RK2928 && !ARCH_RK3066B && !ARCH_RK3026
 	help
 		This supports the use of the 2 Channel I2S2 interface on rk30 processors.
 
-##$_rbox_$_modify_$_huangzhibao_begin$_20120505_$
-config SND_ROCKCHIP_SPDIF
-	tristate
-	select SND_SOC_SPDIF
-##$_rbox_$_modify_$_huangzhibao_end$_20120505_$	
-
-##$_rbox_$_modify_$_huangzhibao_begin$_20120505_add  and rename SND_DMA_EVENT_STATIC$ 		
-if 	SND_RK29_SOC_I2S_2CH || SND_RK29_SOC_I2S_8CH || SND_RK_SOC_I2S2_2CH || SND_ROCKCHIP_SPDIF
+if 	SND_RK29_SOC_I2S_2CH || SND_RK29_SOC_I2S_8CH || SND_RK_SOC_I2S2_2CH
 choice
-  bool "Set audio DMA event mode"
-  default SND_DMA_EVENT_STATIC
-	config SND_DMA_EVENT_DYNAMIC
+  bool "Set i2s on DMA event mode"
+  default SND_I2S_DMA_EVENT_STATIC
+	config SND_I2S_DMA_EVENT_DYNAMIC
 		tristate  "dynamic mode"
 
-config SND_DMA_EVENT_STATIC
-	tristate  "static mode"
+	config SND_I2S_DMA_EVENT_STATIC
+		tristate  "static mode"
 endchoice
-endif	
-##$_rbox_$_modify_$_huangzhibao_end$_20120505_$	
-			
-	  
-##$_rbox_$_modify_$_huangzhibao_begin$_20120505
-config SND_RK_SOC_SPDIF
-	bool "spdif support for rockchip rk29 or rk30"
-	depends on SND_RK29_SOC 
-	select SND_ROCKCHIP_SPDIF
+endif
+
+if SND_RK29_SOC && RK_HDMI
+choice
+  bool "Set audio support for HDMI"
+  default SND_RK_SOC_HDMI_I2S
+	config SND_RK_SOC_HDMI_I2S
+		depends on !RK616_USE_MCLK_12M || !SND_RK_SOC_RK616
+		select SND_RK29_SOC_I2S
+		select SND_SOC_HDMI_I2S
+		tristate  "HDMI use I2S"
+
+	config SND_RK_SOC_HDMI_SPDIF
+		depends on SND_RK_SOC_RK616
+		select SND_RK_SOC_SPDIF
+		select SND_SOC_HDMI_SPDIF
+		tristate  "HDMI use SPDIF"
+endchoice
+endif
+
+config SND_RK29_SOC_ES8323
+	tristate "SoC I2S Audio support for rockchip - ES8323"
+	depends on SND_RK29_SOC
+	select SND_RK29_SOC_I2S
+	select SND_SOC_ES8323
 	help
 	  Say Y if you want to add support for SoC audio on rockchip
-	  with the spdif.
-##$_rbox_$_modify_$_huangzhibao_end$_20120505
+	  with the ES8323.
+
+config SND_SOC_ES8323_PCM
+	tristate "SoC I2S Audio support for rockchip - ES8323 for PCM modem"
+	depends on SND_RK29_SOC
+	help
+	  Say Y if you want to add support for SoC audio on rockchip
+	  with the ES8323 for PCM modem.
 
 config SND_RK29_SOC_WM8988
 	tristate "SoC I2S Audio support for rockchip - WM8988"
@@ -159,7 +187,16 @@ config SND_RK29_SOC_RT3224
 	select SND_SOC_RT3224
 	help
 	  RT3224 is pin to pin as RT3261, but not have dsp function.
-
+	  
+config SND_RK29_SOC_RT5616
+	tristate "SoC I2S Audio support for rockchip - RT5616"
+	depends on SND_RK29_SOC
+	select SND_RK29_SOC_I2S
+	select SND_SOC_RT5616
+	help
+	  Say Y if you want to add support for SoC audio on rockchip
+	  with the RT5616.
+	  
 config SND_RK29_SOC_RT3261
 	tristate "SoC I2S Audio support for rockchip - RT3261"
 	depends on SND_RK29_SOC
@@ -214,17 +251,6 @@ config SND_RK29_SOC_RK1000
 	  Say Y if you want to add support for SoC audio on rockchip
 	  with the RK1000.
 
-config SND_RK_SOC_HDMI
-	tristate "SoC I2S Audio support for rockchip - HDMI"
-	depends on SND_RK29_SOC
-	select SND_RK29_SOC_I2S
-##$_rbox_$_modify_$_zhengyang_begin$_20120704
-	select SND_SOC_RK_HDMI_CODEC
-##$_rbox_$_modify_$_zhengyang_end$_20120704
-	help
-	  Say Y if you want to add support for SoC audio on rockchip
-	  with the HDMI.
-
 config SND_RK29_SOC_RK610
 	tristate "SoC I2S Audio support for rockchip - RK610"
 	depends on SND_RK29_SOC && MFD_RK610
@@ -233,6 +259,15 @@ config SND_RK29_SOC_RK610
 	help
 	  Say Y if you want to add support for SoC audio on rockchip
 	  with the RK610(JETTA).
+
+config SND_RK_SOC_RK616
+	tristate "SoC I2S Audio support for rockchip - RK616"
+	depends on SND_RK29_SOC && MFD_RK616
+	select SND_RK29_SOC_I2S
+	select SND_SOC_RK616
+	help
+	  Say Y if you want to add support for SoC audio on rockchip
+	  with the RK616(JETTA).
 
 config SND_RK_SOC_RK2928
 	tristate "SoC I2S Audio support for rockchip - RK2928"
@@ -244,7 +279,17 @@ config SND_RK_SOC_RK2928
 	  Say Y if you want to add support for SoC audio on rockchip
 	  with the RK2928 internal codec.
 
-if SND_RK29_SOC_I2S_2CH || SND_RK29_SOC_I2S_8CH || SND_RK_SOC_I2S2_2CH
+config SND_RK_SOC_RK3026
+	tristate "SoC I2S Audio support for rockchip - RK3026&R3028A"
+	depends on SND_RK29_SOC && ARCH_RK3026
+	select SND_RK29_SOC_I2S
+	select SND_SOC_RK3026
+	select SND_RK29_CODEC_SOC_SLAVE
+	help
+	  Say Y if you want to add support for SoC audio on rockchip
+	  with the RK3026 internal codec.
+
+if SND_RK29_SOC_I2S_2CH || SND_RK29_SOC_I2S_8CH || SND_RK_SOC_I2S2_2CH  
 choice
   bool "Set i2s type"
   default SND_RK29_CODEC_SOC_SLAVE

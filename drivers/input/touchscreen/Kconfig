@@ -17,6 +17,9 @@ config CT36X_TS
 config TOUCHSCREEN_GSLX680
 		tristate "gslX680 touchscreen panel support "
 		depends on I2C2_RK29 || I2C2_RK30
+config TOUCHSCREEN_GSLX680_RK3168
+		tristate "gslX680 rk3168 touchscreen panel support "
+		depends on I2C2_RK29 || I2C2_RK30
 
 config TOUCHSCREEN_XPT2046_SPI
 	tristate "XPT2046 based touchscreens:SPI Interface"
@@ -144,7 +147,12 @@ config TOUCHSCREEN_GT8XX
                   goodix touch max y resolution
 
 config TOUCHSCREEN_CT36X
+	default n
 	tristate "CT36X based touchscreens"
+	
+config TOUCHSCREEN_CT36X_WLD
+	default n
+	tristate "CT36X based touchscreens for WLD"
 
 config RK28_I2C_TS_NTP070
 	tristate "NTP070 based touchscreens: NTP070 Interface"
@@ -996,6 +1004,10 @@ config TOUCHSCREEN_GT818_IIC
 	tristate "GT818_IIC based touchscreens"
 	depends on I2C2_RK29
 
+config TOCHSCREEN_GT9XX_IIC
+    tristate "GT9XX_IIC based touchscreens"
+    depends on I2C2_RK30
+
 config TOUCHSCREEN_PIXCIR
 	tristate "PIXCIR_IIC based touchscreens"
 	depends on I2C2_RK29
@@ -1059,6 +1071,25 @@ config TOUCHSCREEN_FT5406
 	  in its table of I2C devices.
 
 	  If unsure, say N(but it's safe to say "Y").
+config TOUCHSCREEN_FT5506
+	tristate "FT5506 based touchscreens: FT5506 Interface"
+	depends on I2C2_RK29 || I2C2_RK30
+	help
+	  say Y here if you have a touchscreen interface using the FT5506
+	  controller,and your board-specific initialization code includes that
+	  in its table of I2C devices.
+
+	  If unsure, say N(but it's safe to say "Y").
+
+config TOUCHSCREEN_FT5406_PHONEPAD
+	tristate "FT5406 based touchscreens: FT5406 Interface for phonepad"
+	depends on I2C2_RK29 || I2C2_RK30
+	help
+	say Y here if you have a touchscreen interface using the FT5406
+	controller,and your board-specific initialization code includes that
+	in its table of I2C devices.
+	
+	If unsure, say N(but it's safe to say "Y").
 
 config TOUCHSCREEN_FT5X0X
 		tristate "ft5x0x touchscreen panel support "

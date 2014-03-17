@@ -145,5 +145,8 @@ static int __init bvalid_init(void)
 
 	return 0;
 }
+#if defined(CONFIG_ARCH_RK2928) || defined(CONFIG_ARCH_RK3188)
 late_initcall(bvalid_init);
 #endif
+#endif
+

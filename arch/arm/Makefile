@@ -111,10 +111,16 @@ ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
 CFLAGS_MODULE	+=-fno-optimize-sibling-calls
 endif
 endif
-
+ifeq ($(CONFIG_USE_HARDFLOAT_VPU),y)
+# Omegamoon performance tweaks >>
+KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) -mfloat-abi=hard -mfpu=neon -mcpu=cortex-a8 -mtune=cortex-a8 -O3
+KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) -mfloat-abi=hard -mfpu=neon -mcpu=cortex-a8 -mtune=cortex-a8 -O3 -include asm/unified.h
+# Omegamoon performance tweaks <<
+else
 # Need -Uarm for gcc < 3.x
 KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
 KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+endif
 
 CHECKFLAGS	+= -D__arm__
 
@@ -173,6 +179,7 @@ machine-$(CONFIG_ARCH_PXA)		:= pxa
 machine-$(CONFIG_ARCH_REALVIEW)		:= realview
 machine-$(CONFIG_ARCH_RK29)   		:= rk29
 machine-$(CONFIG_ARCH_RK2928)		:= rk2928
+machine-$(CONFIG_ARCH_RK3026)		:= rk3026
 machine-$(CONFIG_ARCH_RK30)		:= rk30
 machine-$(CONFIG_ARCH_RK3188)		:= rk3188
 machine-$(CONFIG_ARCH_RPC)		:= rpc

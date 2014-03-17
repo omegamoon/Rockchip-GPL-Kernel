@@ -31,9 +31,9 @@
 #else
 #define i2c_dbg(dev, format, arg...)
 #endif
-
+#if !defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
 #define I2C_CHECK_IDLE
-
+#endif
 #define i2c_writel                 writel_relaxed
 #define i2c_readl                  readl_relaxed
 

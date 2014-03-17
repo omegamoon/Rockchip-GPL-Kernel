@@ -44,6 +44,10 @@
 
 #include <asm/uaccess.h>
 
+// Omegamoon >> Changed to make "dmesg --follow" work; See Fedora bug 952655
+//  https://lists.fedoraproject.org/pipermail/scm-commits/Week-of-Mon-20130506/1014794.html
+//  Files changed: fs/proc/kmsg.c; include/linux/syslog.h; kernel/printk.c
+
 /*
  * Architectures can override it:
  */
@@ -351,8 +355,14 @@ static int syslog_action_restricted(int type)
 {
 	if (dmesg_restrict)
 		return 1;
-	/* Unless restricted, we allow "read all" and "get buffer size" for everybody */
-	return type != SYSLOG_ACTION_READ_ALL && type != SYSLOG_ACTION_SIZE_BUFFER;
+	// Unless restricted, we allow "read all" and "get buffer size" for everybody 
+	//return type != SYSLOG_ACTION_READ_ALL && type != SYSLOG_ACTION_SIZE_BUFFER;
+	/*
+	 * Unless restricted, we allow "read all" and "get buffer size"
+	 * for everybody.
+	 */
+	return type != SYSLOG_ACTION_READ_ALL &&
+	       type != SYSLOG_ACTION_SIZE_BUFFER;
 }
 
 static int check_syslog_permissions(int type, bool from_file)
@@ -536,7 +546,8 @@ out:
 
 SYSCALL_DEFINE3(syslog, int, type, char __user *, buf, int, len)
 {
-	return do_syslog(type, buf, len, SYSLOG_FROM_CALL);
+	//return do_syslog(type, buf, len, SYSLOG_FROM_CALL);
+	return do_syslog(type, buf, len, SYSLOG_FROM_READER);
 }
 
 #ifdef	CONFIG_KGDB_KDB
@@ -1236,6 +1247,7 @@ static int __cpuinit console_cpu_notify(struct notifier_block *self,
 	switch (action) {
 	case CPU_ONLINE:
 	case CPU_DEAD:
+	case CPU_DYING:
 	case CPU_DOWN_FAILED:
 	case CPU_UP_CANCELED:
 		console_lock();

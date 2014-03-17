@@ -1,5 +1,5 @@
 config MALI
-	bool "ARM Mali GPU modules"
+	tristate "ARM Mali GPU modules"
 	depends on ARM && m
         select UMP
         select MALI400

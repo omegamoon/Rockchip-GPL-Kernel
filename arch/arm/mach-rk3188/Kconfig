@@ -4,6 +4,11 @@ choice
 
 config SOC_RK3188
 	bool "RK3188"
+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+
+config SOC_RK3188M
+	bool "RK3188M"
+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 
 endchoice
 
@@ -13,6 +18,9 @@ choice
 
 config MACH_RK3188_TB
 	bool "RK3188 Top Board"
+
+config MACH_RK3188_SDK
+	bool "RK3188 sdk Board"
 
 config MACH_RK3188_FPGA
 	bool "RK3188 FPGA board"
@@ -24,14 +32,25 @@ config MACH_RK3188_LR097
 config MACH_RK3188_DS1006H
 	bool "RK3188 ds1006h board"
 
+config MACH_RK3188_FAC
+        bool "RK3188 Board for factory"
+        select MACH_RK_FAC
+
 config MACH_RK3188_BOX
 	bool "RK3188 box board"
 	
+config MACH_RK3188_GENERIC
+	bool "Generic RK3188 board"
+
 endchoice
 
 
-menu "RK3188 Custom Tweaks"
- 	depends on ARCH_RK3188 && MACH_RK3188_BOX
+menu "Rockchip RK30xx/RK31xx Custom Tweaks"
+ 	depends on PLAT_RK
+
+config USE_HARDFLOAT_VPU
+	bool "Hardfloat kernel (beware, needs hardfloat userspace as well)"
+	default n
 
 config TCC_BT_DEV_POWER_PIN3_PD1
 	depends on TCC_BT_DEV
@@ -42,11 +61,29 @@ config ACT8846_DCDC4_30V
 	depends on REGULATOR_ACT8846
 	bool "Set ACT8846 DCDC4 to 3.0V"
 	default n
+        help
+	  Enable : Sets DCDC4 voltage to 3.0V
+	  Disable: Sets DCDC4 voltage to 3.3V (default)
+	
+	  K-R42 aka MK888 aka CS918: 
+	  MK908                    : 
+	  Rikomagic MK802IV        : Disable
+	  Radxa Rock               : Disable
+	  Minix Neo X7             : Disable
 
 config ACT8846_LDO6_18V
 	depends on REGULATOR_ACT8846
 	bool "Set ACT8846 LDO6 to 1.8V"
-	default n
+	default y
+        help
+	  Enable : Sets LDO6 voltage to 1.8V
+	  Disable: Sets LDO6 voltage to 3.3V (default)
+	
+	  K-R42 aka MK888 aka CS918: Enable
+	  MK908                    : Enable
+	  Rikomagic MK802IV        : Enable
+	  Radxa Rock               : Enable
+	  Minix Neo X7             : Enable
 	
 config POWERON_LED_ENABLE
 	bool "Enable PowerOn LED (MK908)"
@@ -68,8 +105,9 @@ config RFKILL_RK_POWERON_GPIO
 	  
 	  K-R42 aka MK888 aka CS918: 279 (RK30_PIN3_PC7; ID 'btdefault')
 	  MK908                    : -1 (INVALID_GPIO; ID 'ap6210')
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 281 (RK30_PIN3_PD1; ID 'ap6210_poweron')
+	  Radxa Rock               : 279  (RK30_PIN3_PC7; ID 'bt_default_poweron')
+	  Minix Neo X7             : -1 (INVALID_GPIO; ID 'bt_default_poweron')
 
           See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
 config RFKILL_RK_POWERON_IOMUX
@@ -82,8 +120,9 @@ config RFKILL_RK_POWERON_IOMUX
 	  
 	  K-R42 aka MK888 aka CS918: 0x3c70 (GPIO3_C7)
 	  MK908                    : 0x3c70 (GPIO3_C7)
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               :
+	  Rikomagic MK802IV        : 0x3d10 (GPIO3_D1)
+	  Radxa Rock               : 0x3c70 (GPIO3_C7)
+	  Minix Neo X7             : 0x3d00 (GPIO3_D0)
 
           See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
 endmenu
@@ -104,8 +143,9 @@ config RFKILL_RK_RESET_GPIO
 	  
 	  K-R42 aka MK888 aka CS918: 281 (RK30_PIN3_PD1; ID 'btdefault')
 	  MK908                    : 281 (RK30_PIN3_PD1; ID 'ap6210')
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : -1 (INVALID_GPIO)
+	  Radxa Rock               : 281 (RK30_PIN3_PD1; ID 'bt_default_reset')
+	  Minix Neo X7             : 281 (RK30_PIN3_PD1; ID 'bt_default_reset')
 
           See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
 config RFKILL_RK_RESET_IOMUX
@@ -118,8 +158,9 @@ config RFKILL_RK_RESET_IOMUX
 	  
 	  K-R42 aka MK888 aka CS918: 0x3d10 (GPIO3_D1)
 	  MK908                    : 0x3d10 (GPIO3_D1)
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : N/A
+	  Radxa Rock               : 0x3d10 (GPIO3_D1)
+	  Minix Neo X7             : 0x3d10 (GPIO3_D1)
 
           See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
 endmenu
@@ -140,8 +181,9 @@ config RFKILL_RK_WAKE_GPIO
 	  
 	  K-R42 aka MK888 aka CS918: 278 (RK30_PIN3_PC6; ID 'btdefault')
 	  MK908                    : 278 (RK30_PIN3_PC6; ID 'ap6210')
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 279 (RK30_PIN3_PC7; ID 'ap6210_wake')
+	  Radxa Rock               : 278 (RK30_PIN3_PC6; ID 'bt_default_wake')
+	  Minix Neo X7             : 279 (RK30_PIN3_PC7; ID 'bt_default_wake')
 
           See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
 config RFKILL_RK_WAKE_IOMUX
@@ -154,8 +196,9 @@ config RFKILL_RK_WAKE_IOMUX
 	  
 	  K-R42 aka MK888 aka CS918: 0x3c60 (GPIO3_C6)
 	  MK908                    : 0x3c60 (GPIO3_C6)
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 0x3c70 (GPIO3_C7)
+	  Radxa Rock               : 0x3c60 (GPIO3_C6)
+	  Minix Neo X7             : 0x3c70 (GPIO3_C7)
 
           See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
 endmenu
@@ -176,8 +219,9 @@ config RFKILL_RK_WAKEHOST_GPIO
 	  
 	  K-R42 aka MK888 aka CS918: 282 (RK30_PIN3_PD2; ID 'btdefault')
 	  MK908                    : 279 (RK30_PIN3_PC7; ID 'ap6210')
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 278 (RK30_PIN3_PC6; ID 'ap6210_wake_host')
+	  Radxa Rock               : 282 (RK30_PIN3_PD2; ID 'bt_default_wake_host')
+	  Minix Neo X7             : 278 (RK30_PIN3_PC6; ID 'bt_default_wake_host')
 
           See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
 config RFKILL_RK_WAKEHOST_IOMUX
@@ -190,8 +234,9 @@ config RFKILL_RK_WAKEHOST_IOMUX
 	  
 	  K-R42 aka MK888 aka CS918: 0x3d20 (GPIO3_D2)
 	  MK908                    : 0x3c70 (GPIO3_C7)
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 0x3c60 (GPIO3_C6)
+	  Radxa Rock               : 0x3d20 (GPIO3_D2)
+	  Minix Neo X7             : 0x3c60 (GPIO3_C6)
 
           See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
 endmenu
@@ -212,8 +257,9 @@ config RFKILL_RK_RTS_GPIO
 	  
 	  K-R42 aka MK888 aka CS918: 195 (RK30_PIN1_PA3; ID 'btdefault')
 	  MK908                    : 195 (RK30_PIN1_PA3; ID 'ap6210')
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 195 (RK30_PIN1_PA3; ID 'ap6210_rts')
+	  Radxa Rock               : 195 (RK30_PIN1_PA3; ID 'bt_default_rts')
+	  Minix Neo X7             : 195 (RK30_PIN1_PA3; ID 'ap6330_rts')
 
           See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
 config RFKILL_RK_RTS_IOMUX
@@ -226,13 +272,13 @@ config RFKILL_RK_RTS_IOMUX
 	  
 	  K-R42 aka MK888 aka CS918: 0x1a30 (GPIO1_A3)
 	  MK908                    : 0x1a30 (GPIO1_A3)
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : 0x1a30 (GPIO1_A3)
+	  Radxa Rock               : 0x1a30 (GPIO1_A3)
 
           See arch/arm/mach-rk3188/include/mach/iomux.h for IOMUX values
 endmenu
 
-menu	"RK1000 RESET GPIO"
+menu	"RK1000 Settings"
 	depends on MFD_RK1000
 config RK1000_RESET_GPIO
 	int "RK1000 RESET GPIO value"
@@ -245,8 +291,21 @@ config RK1000_RESET_GPIO
 	  Rockchip default         : 284 (RK30_PIN3_PD4)
 	  K-R42 aka MK888 aka CS918: 191 (RK30_PIN0_PD7)
 	  MK908                    : N/A
-	  Rikomagic MK802IV        : 
-	  Radxa Rock               : 
+	  Rikomagic MK802IV        : N/A
+	  Radxa Rock               : 287 (RK30_PIN3_PD7)
+
+          See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
+config RK1000_SWITCH_GPIO
+	int "RK1000 SWITCH GPIO value"
+	default 255
+        help
+	  If unsure, use the default value!
+	  INVALID_GPIO = -1
+	  
+	  K-R42 aka MK888 aka CS918: N/A
+	  MK908                    : N/A
+	  Rikomagic MK802IV        : N/A
+	  Radxa Rock               : 255 (RK30_PIN2_PD7)
 
           See /arch/arm/mach-rk30/include/mach/gpio.h for GPIO values
 endmenu
@@ -259,6 +318,11 @@ config VSYNCFIX_PHJA
   bool "Workaround for jerky video playback by disabling the ktime_equal check in the vsync handler - not recommended (phjanderson)"
   default n
 
+config MINIX_NEOX7_WORKAROUNDS
+  bool "Introduces a lot of weird Minix Neo X7 specifc coding. Only enable for the Neo X7!"
+  default n
+  help
+	Needs to be cleaned up!
 choice 	
   prompt "Primary LCDC display type"
 
@@ -267,7 +331,16 @@ config RK_LCDC0_AS_PRIMARY
   
 config RK_LCDC1_AS_PRIMARY
   bool "LCDC0 is extended and LCDC1 is primary display device"
-  
+endchoice
+
+choice
+	prompt "Video mode handling"
+config AUTO_VIDEO_MODE_HANDLING
+	bool "Automatic video mode handling" 
+config FORCE_HDMI_VIDEO_MODE
+	bool "Force HDMI video output to fix blank screen/no signal problem" 
+config FORCE_DVI_VIDEO_MODE
+	bool "Force DVI video output to fix blank screen/no signal problem" 
 endchoice
 
 menu	"CPU Frequency Scaling"

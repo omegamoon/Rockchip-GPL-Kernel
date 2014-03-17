@@ -35,12 +35,6 @@ config MACH_RK2926_TB
 config MACH_RK2928_FPGA
 	bool "RK2928 FPGA board"
 
-config MACH_RK2928_LITEBOX
-	bool "RK2928 Lite Box board"
-
-config MACH_RK2928_LOLLIPOP
-	bool "RK2928 Box Lollipop board"
-	
 endchoice
 
 endif

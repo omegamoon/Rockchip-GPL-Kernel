@@ -17,8 +17,8 @@
 
 struct i2c_client * rk1000_control_client = NULL;
 
-
-
+// >>> Omegamoon - Be aware that rk1000 is set in board file, struct tv_data!!
+#define OMEGAMOON_CHANGED
 
 int reg_send_data(struct i2c_client *client, const char start_reg,
 				const char *buf, int count, unsigned int scl_rate)
@@ -64,11 +64,11 @@ static int rk1000_control_probe(struct i2c_client *client,
 		#elif defined(CONFIG_ARCH_RK30)
         rk30_mux_api_set(GPIO0B0_I2S8CHCLK_NAME, GPIO0B_I2S_8CH_CLK);
         #elif defined(CONFIG_ARCH_RK3066B)||defined(CONFIG_ARCH_RK3188)
-		iomux_set(I2S0_CLK);
+		iomux_set(I2S0_MCLK);
 		#endif
 		clk_put(iis_clk);
 	}
-    
+#ifdef OMEGAMOON_CHANGED
     if(client->dev.platform_data) {
 		tv_data = client->dev.platform_data;
 		if(tv_data->io_reset_pin != INVALID_GPIO) {
@@ -84,7 +84,20 @@ static int rk1000_control_probe(struct i2c_client *client,
 		    gpio_set_value(tv_data->io_reset_pin, GPIO_HIGH);
 		}
 	}
-    
+#else
+	    	ret = gpio_request(RK30_PIN2_PD7, "rk1000 reset");
+		    if (ret){   
+		        printk("rk1000_control_probe request gpio fail\n");
+		        //goto err1;
+		    }
+		    
+		    gpio_set_value(RK30_PIN2_PD7, GPIO_LOW);
+		    gpio_direction_output(RK30_PIN2_PD7, GPIO_LOW);
+		    mdelay(2);
+		    gpio_set_value(RK30_PIN2_PD7, GPIO_HIGH);
+
+
+#endif    
     rk1000_control_client = client;
 
 #ifdef CONFIG_SND_SOC_RK1000

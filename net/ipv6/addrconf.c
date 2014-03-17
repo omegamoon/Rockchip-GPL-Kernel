@@ -826,13 +826,12 @@ static int ipv6_create_tempaddr(struct inet6_ifaddr *ifp, struct inet6_ifaddr *i
 {
 	struct inet6_dev *idev = ifp->idev;
 	struct in6_addr addr, *tmpaddr;
-	unsigned long tmp_prefered_lft, tmp_valid_lft, tmp_tstamp, age;
+	unsigned long tmp_prefered_lft, tmp_valid_lft, tmp_cstamp, tmp_tstamp, age;
 	unsigned long regen_advance;
 	int tmp_plen;
 	int ret = 0;
 	int max_addresses;
 	u32 addr_flags;
-	unsigned long now = jiffies;
 
 	write_lock(&idev->lock);
 	if (ift) {
@@ -877,7 +876,7 @@ retry:
 		goto out;
 	}
 	memcpy(&addr.s6_addr[8], idev->rndid, 8);
-	age = (now - ifp->tstamp) / HZ;
+	age = (jiffies - ifp->tstamp) / HZ;
 	tmp_valid_lft = min_t(__u32,
 			      ifp->valid_lft,
 			      idev->cnf.temp_valid_lft + age);
@@ -887,6 +886,7 @@ retry:
 				 idev->cnf.max_desync_factor);
 	tmp_plen = ifp->prefix_len;
 	max_addresses = idev->cnf.max_addresses;
+	tmp_cstamp = ifp->cstamp;
 	tmp_tstamp = ifp->tstamp;
 	spin_unlock_bh(&ifp->lock);
 
@@ -912,12 +912,10 @@ retry:
 	if (ifp->flags & IFA_F_OPTIMISTIC)
 		addr_flags |= IFA_F_OPTIMISTIC;
 
-	ift = !max_addresses ||
-	      ipv6_count_addresses(idev) < max_addresses ?
-		ipv6_add_addr(idev, &addr, tmp_plen,
-			      ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK,
-			      addr_flags) : NULL;
-	if (!ift || IS_ERR(ift)) {
+	ift = ipv6_add_addr(idev, &addr, tmp_plen,
+			    ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK,
+			    addr_flags);
+	if (IS_ERR(ift)) {
 		in6_ifa_put(ifp);
 		in6_dev_put(idev);
 		printk(KERN_INFO
@@ -931,7 +929,7 @@ retry:
 	ift->ifpub = ifp;
 	ift->valid_lft = tmp_valid_lft;
 	ift->prefered_lft = tmp_prefered_lft;
-	ift->cstamp = now;
+	ift->cstamp = tmp_cstamp;
 	ift->tstamp = tmp_tstamp;
 	spin_unlock_bh(&ift->lock);
 
@@ -1235,6 +1233,23 @@ try_nextdev:
 }
 EXPORT_SYMBOL(ipv6_dev_get_saddr);
 
+int __ipv6_get_lladdr(struct inet6_dev *idev, struct in6_addr *addr,
+		      unsigned char banned_flags)
+{
+	struct inet6_ifaddr *ifp;
+	int err = -EADDRNOTAVAIL;
+
+	list_for_each_entry(ifp, &idev->addr_list, if_list) {
+		if (ifp->scope == IFA_LINK &&
+		    !(ifp->flags & banned_flags)) {
+			ipv6_addr_copy(addr, &ifp->addr);
+			err = 0;
+			break;
+		}
+	}
+	return err;
+}
+
 int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr,
 		    unsigned char banned_flags)
 {
@@ -1244,17 +1259,8 @@ int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr,
 	rcu_read_lock();
 	idev = __in6_dev_get(dev);
 	if (idev) {
-		struct inet6_ifaddr *ifp;
-
 		read_lock_bh(&idev->lock);
-		list_for_each_entry(ifp, &idev->addr_list, if_list) {
-			if (ifp->scope == IFA_LINK &&
-			    !(ifp->flags & banned_flags)) {
-				ipv6_addr_copy(addr, &ifp->addr);
-				err = 0;
-				break;
-			}
-		}
+		err = __ipv6_get_lladdr(idev, addr, banned_flags);
 		read_unlock_bh(&idev->lock);
 	}
 	rcu_read_unlock();
@@ -1990,50 +1996,25 @@ ok:
 #ifdef CONFIG_IPV6_PRIVACY
 			read_lock_bh(&in6_dev->lock);
 			/* update all temporary addresses in the list */
-			list_for_each_entry(ift, &in6_dev->tempaddr_list,
-					    tmp_list) {
-				int age, max_valid, max_prefered;
-
+			list_for_each_entry(ift, &in6_dev->tempaddr_list, tmp_list) {
+				/*
+				 * When adjusting the lifetimes of an existing
+				 * temporary address, only lower the lifetimes.
+				 * Implementations must not increase the
+				 * lifetimes of an existing temporary address
+				 * when processing a Prefix Information Option.
+				 */
 				if (ifp != ift->ifpub)
 					continue;
 
-				/*
-				 * RFC 4941 section 3.3:
-				 * If a received option will extend the lifetime
-				 * of a public address, the lifetimes of
-				 * temporary addresses should be extended,
-				 * subject to the overall constraint that no
-				 * temporary addresses should ever remain
-				 * "valid" or "preferred" for a time longer than
-				 * (TEMP_VALID_LIFETIME) or
-				 * (TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR),
-				 * respectively.
-				 */
-				age = (now - ift->cstamp) / HZ;
-				max_valid = in6_dev->cnf.temp_valid_lft - age;
-				if (max_valid < 0)
-					max_valid = 0;
-
-				max_prefered = in6_dev->cnf.temp_prefered_lft -
-					       in6_dev->cnf.max_desync_factor -
-					       age;
-				if (max_prefered < 0)
-					max_prefered = 0;
-
-				if (valid_lft > max_valid)
-					valid_lft = max_valid;
-
-				if (prefered_lft > max_prefered)
-					prefered_lft = max_prefered;
-
 				spin_lock(&ift->lock);
 				flags = ift->flags;
-				ift->valid_lft = valid_lft;
-				ift->prefered_lft = prefered_lft;
-				ift->tstamp = now;
-				if (prefered_lft > 0)
-					ift->flags &= ~IFA_F_DEPRECATED;
-
+				if (ift->valid_lft > valid_lft &&
+				    ift->valid_lft - valid_lft > (jiffies - ift->tstamp) / HZ)
+					ift->valid_lft = valid_lft + (jiffies - ift->tstamp) / HZ;
+				if (ift->prefered_lft > prefered_lft &&
+				    ift->prefered_lft - prefered_lft > (jiffies - ift->tstamp) / HZ)
+					ift->prefered_lft = prefered_lft + (jiffies - ift->tstamp) / HZ;
 				spin_unlock(&ift->lock);
 				if (!(flags&IFA_F_TENTATIVE))
 					ipv6_ifa_notify(0, ift);
@@ -2041,11 +2022,9 @@ ok:
 
 			if ((create || list_empty(&in6_dev->tempaddr_list)) && in6_dev->cnf.use_tempaddr > 0) {
 				/*
-				 * When a new public address is created as
-				 * described in [ADDRCONF], also create a new
-				 * temporary address. Also create a temporary
-				 * address if it's enabled but no temporary
-				 * address currently exists.
+				 * When a new public address is created as described in [ADDRCONF],
+				 * also create a new temporary address. Also create a temporary
+				 * address if it's enabled but no temporary address currently exists.
 				 */
 				read_unlock_bh(&in6_dev->lock);
 				ipv6_create_tempaddr(ifp, NULL);
@@ -2354,6 +2333,9 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 static void init_loopback(struct net_device *dev)
 {
 	struct inet6_dev  *idev;
+	struct net_device *sp_dev;
+	struct inet6_ifaddr *sp_ifa;
+	struct rt6_info *sp_rt;
 
 	/* ::1 */
 
@@ -2365,6 +2347,35 @@ static void init_loopback(struct net_device *dev)
 	}
 
 	add_addr(idev, &in6addr_loopback, 128, IFA_HOST);
+
+	/* Add routes to other interface's IPv6 addresses */
+	for_each_netdev(dev_net(dev), sp_dev) {
+		if (!strcmp(sp_dev->name, dev->name))
+			continue;
+
+		idev = __in6_dev_get(sp_dev);
+		if (!idev)
+			continue;
+
+		read_lock_bh(&idev->lock);
+		list_for_each_entry(sp_ifa, &idev->addr_list, if_list) {
+
+			if (sp_ifa->flags & (IFA_F_DADFAILED | IFA_F_TENTATIVE))
+				continue;
+
+			if (sp_ifa->rt)
+				continue;
+
+			sp_rt = addrconf_dst_alloc(idev, &sp_ifa->addr, 0);
+
+			/* Failure cases are ignored */
+			if (!IS_ERR(sp_rt)) {
+				sp_ifa->rt = sp_rt;
+				ip6_ins_rt(sp_rt);
+			}
+		}
+		read_unlock_bh(&idev->lock);
+	}
 }
 
 static void addrconf_add_linklocal(struct inet6_dev *idev, const struct in6_addr *addr)

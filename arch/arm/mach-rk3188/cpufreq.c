@@ -37,9 +37,10 @@
 #include <mach/cpu.h>
 #include <mach/ddr.h>
 #include <mach/dvfs.h>
+#include <plat/efuse.h>
 
 #define OMEGAMOON_CHANGED		1
-#define VERSION "2.1"
+#define VERSION "2.2"
 
 #ifdef DEBUG
 #define FREQ_DBG(fmt, args...) pr_debug(fmt, ## args)
@@ -83,7 +84,11 @@ static struct cpufreq_frequency_table *freq_table = default_freq_table;
 #define CPUFREQ_PRIVATE                 0x100
 static int no_cpufreq_access;
 static unsigned int suspend_freq = 816 * 1000;
+#if defined(CONFIG_ARCH_RK3026)
+static unsigned int suspend_volt = 1100000; // 1.1V
+#else
 static unsigned int suspend_volt = 1000000; // 1V
+#endif
 static unsigned int low_battery_freq = 600 * 1000;
 static unsigned int low_battery_capacity = 5; // 5%
 static bool is_booting = true;
@@ -174,6 +179,34 @@ static struct cpufreq_frequency_table temp_limits_cpu_perf[] = {
 
 static struct cpufreq_frequency_table temp_limits_gpu_perf[] = {
 	{.frequency = 1008 * 1000, .index = 0},
+};
+#elif defined(CONFIG_ARCH_RK3026)
+static struct cpufreq_frequency_table temp_limits[2][1] = {
+	{	// 1 CPU busy
+		{.frequency =  912 * 1000, .index = 0},
+	}, {	// 2 CPUs busy
+		{.frequency =  816 * 1000, .index = 0},
+	}
+};
+
+static struct cpufreq_frequency_table temp_limits_cpu_perf[] = {
+	{.frequency = 1008 * 1000, .index = 0},
+};
+
+static struct cpufreq_frequency_table temp_limits_gpu_perf[] = {
+	{.frequency = 1008 * 1000, .index = 0},
+};
+
+static struct cpufreq_frequency_table temp_limits_3028a[2][1] = {
+	{	// 1 CPU busy
+		{.frequency =          -1, .index = 0},
+	}, {	// 2 CPUs busy
+		{.frequency = 1008 * 1000, .index = 0},
+	}
+};
+
+static struct cpufreq_frequency_table temp_limits_cpu_perf_3028a[] = {
+	{.frequency = 1200 * 1000, .index = 0},
 };
 #else /* 3188/3168 etc */
 static struct cpufreq_frequency_table temp_limits[4][4] = {
@@ -358,6 +391,13 @@ static void rk3188_cpufreq_temp_limit_init(struct cpufreq_policy *policy)
 	unsigned int i;
 	struct cpufreq_frequency_table *table;
 
+#if defined(CONFIG_ARCH_RK3026)
+	if (soc_is_rk3028a()) {
+		memcpy(temp_limits, temp_limits_3028a, sizeof(temp_limits));
+		memcpy(temp_limits_cpu_perf, temp_limits_cpu_perf_3028a, sizeof(temp_limits_cpu_perf));
+	}
+#endif
+
 	table = temp_limits[0];
 	for (i = 0; i < sizeof(temp_limits) / sizeof(struct cpufreq_frequency_table); i++) {
 		table[i].frequency = get_freq_from_table(table[i].frequency);
@@ -441,6 +481,7 @@ static int rk3188_cpufreq_verify(struct cpufreq_policy *policy)
 static int rk3188_cpufreq_init_cpu0(struct cpufreq_policy *policy)
 {
 	unsigned int i;
+	struct cpufreq_frequency_table *table_adjust;
 
 	gpu_is_mali400 = cpu_is_rk3188();
 	gpu_clk = clk_get(NULL, "gpu");
@@ -455,16 +496,11 @@ static int rk3188_cpufreq_init_cpu0(struct cpufreq_policy *policy)
 	if (IS_ERR(cpu_clk))
 		return PTR_ERR(cpu_clk);
 
-#if defined(CONFIG_ARCH_RK3188)
-	if (soc_is_rk3188() || soc_is_rk3188plus()) {
-		struct cpufreq_frequency_table *table_adjust;
-		/* Adjust dvfs table avoid overheat */
-		table_adjust = dvfs_get_freq_volt_table(cpu_clk);
-		dvfs_adjust_table_lmtvolt(cpu_clk, table_adjust);
-		table_adjust = dvfs_get_freq_volt_table(gpu_clk);
-		dvfs_adjust_table_lmtvolt(gpu_clk, table_adjust);
-	}
-#endif
+	table_adjust = dvfs_get_freq_volt_table(cpu_clk);
+	dvfs_adjust_table_lmtvolt(cpu_clk, table_adjust);
+	table_adjust = dvfs_get_freq_volt_table(gpu_clk);
+	dvfs_adjust_table_lmtvolt(gpu_clk, table_adjust);
+
 	clk_enable_dvfs(gpu_clk);
 	if (gpu_is_mali400)
 #ifdef OMEGAMOON_CHANGED
@@ -490,7 +526,16 @@ static int rk3188_cpufreq_init_cpu0(struct cpufreq_policy *policy)
 	}
 	low_battery_freq = get_freq_from_table(low_battery_freq);
 	clk_enable_dvfs(cpu_clk);
-
+	if(rk_tflag()){
+#define RK3188_T_LIMIT_FREQ	(1416 * 1000)
+		dvfs_clk_enable_limit(cpu_clk, 0, RK3188_T_LIMIT_FREQ * 1000);
+		for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
+			if (freq_table[i].frequency > RK3188_T_LIMIT_FREQ) {
+				printk("cpufreq: delete arm freq(%u)\n", freq_table[i].frequency);
+				freq_table[i].frequency = CPUFREQ_TABLE_END;
+			}
+		}
+	}
 	freq_wq = alloc_workqueue("rk3188_cpufreqd", WQ_NON_REENTRANT | WQ_MEM_RECLAIM | WQ_HIGHPRI | WQ_FREEZABLE, 1);
 	rk3188_cpufreq_temp_limit_init(policy);
 #ifdef CPU_FREQ_DVFS_TST

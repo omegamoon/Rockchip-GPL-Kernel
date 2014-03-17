@@ -30,13 +30,14 @@
 #include <asm/div64.h>
 #include <asm/uaccess.h>
 #include <mach/iomux.h>
-#include "../hdmi/rk_hdmi.h"
 #include "rk3188_lcdc.h"
+#include <mach/gpio.h>
 
-
+#define OMEGAMOON_CHANGED
 
 static int dbg_thresd = 0;
 module_param(dbg_thresd, int, S_IRUGO|S_IWUSR);
+
 #define DBG(level,x...) do { 			\
 	if(unlikely(dbg_thresd >= level)) 	\
 		printk(KERN_INFO x);} while (0)
@@ -65,7 +66,7 @@ static int rk3188_lcdc_clk_disable(struct rk3188_lcdc_device *lcdc_dev)
 	spin_lock(&lcdc_dev->reg_lock);
 	lcdc_dev->clk_on = 0;
 	spin_unlock(&lcdc_dev->reg_lock);
-
+	mdelay(25);
 	clk_disable(lcdc_dev->dclk);
 	clk_disable(lcdc_dev->hclk);
 	clk_disable(lcdc_dev->aclk);
@@ -100,6 +101,94 @@ static void rk3188_lcdc_reg_dump(struct rk3188_lcdc_device *lcdc_dev)
        }
        
 }
+static void rk3188_lcdc_read_reg_defalut_cfg(struct rk3188_lcdc_device *lcdc_dev)
+{
+	int reg=0;
+	u32 value=0;
+	struct layer_par *win0 =  lcdc_dev->driver.layer_par[0];
+	struct layer_par *win1 =  lcdc_dev->driver.layer_par[1];
+
+	spin_lock(&lcdc_dev->reg_lock);
+	for(reg = 0; reg < REG_CFG_DONE;reg += 4)
+	{
+		value = lcdc_readl(lcdc_dev,reg);
+		switch(reg)
+		{
+		case SYS_CTRL:
+			lcdc_dev->standby = (value & m_LCDC_STANDBY)>>17;
+			win0->state = (value & m_WIN0_EN)>>0;
+			win1->state = (value & m_WIN1_EN)>>1;
+			if(lcdc_dev->id == 0)
+				lcdc_dev->atv_layer_cnt = win0->state;
+			else
+				lcdc_dev->atv_layer_cnt = win1->state;
+			win0->swap_rb = (value & m_WIN0_RB_SWAP)>>15;
+			win1->swap_rb = (value & m_WIN1_RB_SWAP)>>19;
+			win0->fmt_cfg = (value & m_WIN0_FORMAT)>>3;
+			win1->fmt_cfg = (value & m_WIN1_FORMAT)>>6;
+			DBG(2,"standby=%d,win0->state=%d,win1->state=%d,win0->swap_rb=%d,win1->swap_rb=%d,win0->fmt_cfg=%d,win1->fmt_cfg=%d\n",
+				   lcdc_dev->standby,win0->state,win1->state,win0->swap_rb,win1->swap_rb,win0->fmt_cfg,win1->fmt_cfg);
+			break;
+		case WIN0_SCL_FACTOR_YRGB:
+			win0->scale_yrgb_x = (value>> 0)&0xffff;
+			win0->scale_yrgb_y = (value>>16)&0xffff;
+			DBG(2,"win0->scale_yrgb_x=%d,win0->scale_yrgb_y=%d\n",win0->scale_yrgb_x,win0->scale_yrgb_y);
+			break;
+		case WIN0_SCL_FACTOR_CBR:
+			win0->scale_cbcr_x = (value>> 0)&0xffff;
+			win0->scale_cbcr_y = (value>>16)&0xffff;
+			DBG(2,"win0->scale_cbc_x=%d,win0->scale_cbcr_y=%d\n",win0->scale_cbcr_x,win0->scale_cbcr_y);
+			break;
+		case WIN0_ACT_INFO:
+			win0->xact = (((value>> 0)&0x1fff)+1);
+			win0->yact = (((value>>16)&0x1fff)+1);
+			DBG(2,"win0->xact=%d,win0->yact=%d\n",win0->xact,win0->yact);
+			break;
+		case WIN0_DSP_ST:
+			win0->dsp_stx = (value>> 0)&0xfff;
+			win0->dsp_sty = (value>>16)&0xfff;
+			DBG(2,"win0->dsp_stx=%d,win0->dsp_sty=%d\n",win0->dsp_stx,win0->dsp_sty);
+			break;
+		case WIN0_DSP_INFO:
+			win0->xsize = (((value>> 0)&0x7ff)+1);
+			win0->ysize = (((value>>16)&0x7ff)+1);
+			DBG(2,"win0->xsize=%d,win0->ysize=%d\n",win0->xsize,win0->ysize);
+			break;
+		case WIN_VIR:
+			win0->vir_stride = (value>> 0)&0x1fff;
+			win1->vir_stride = (value)&0x1fff0000;
+			DBG(2,"win0->vir_stride=%d,win1->vir_stride=%d\n",win0->vir_stride,win1->vir_stride);
+			break;
+		case WIN0_YRGB_MST0:
+			win0->y_addr = value>> 0;
+			DBG(2,"win0->y_addr=%d\n",win0->y_addr);
+			break;
+		case WIN0_CBR_MST0:
+			win0->uv_addr = value>> 0;
+			DBG(2,"win0->uv_addr=%d\n",win0->uv_addr);
+			break;
+		case WIN1_DSP_INFO:
+			win1->xsize = (((value>> 0)&0x7ff)+1);
+			win1->ysize = (((value>>16)&0x7ff)+1);
+			DBG(2,"win1->xsize=%d,win1->ysize=%d\n",win1->xsize,win1->ysize);
+			break;
+		case WIN1_DSP_ST:
+			win1->dsp_stx = (value>> 0)&0xfff;
+			win1->dsp_sty = (value>>16)&0xfff;
+			DBG(2,"win1->dsp_stx=%d,win1->dsp_sty=%d\n",win1->dsp_stx,win1->dsp_sty);
+			break;
+		case WIN1_MST:
+			win1->y_addr =value>> 0;
+			DBG(2,"win1->y_addr=%d\n",win1->y_addr);
+			break;
+		default:
+			DBG(2,"%s:uncare reg\n",__func__);
+			break;
+		}
+	}
+	spin_unlock(&lcdc_dev->reg_lock);
+	DBG(2,"%s,done\n",__func__);
+}
 
 static int rk3188_lcdc_alpha_cfg(struct rk3188_lcdc_device *lcdc_dev)
 {
@@ -117,24 +206,81 @@ static int rk3188_lcdc_alpha_cfg(struct rk3188_lcdc_device *lcdc_dev)
 	{
 		lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN | m_WIN1_ALPHA_EN,
 				v_WIN0_ALPHA_EN(1) | v_WIN1_ALPHA_EN(0));
+		lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN0_ALPHA_MODE | m_ALPHA_MODE_SEL0 |
+			m_ALPHA_MODE_SEL1,v_WIN0_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1) |
+			v_ALPHA_MODE_SEL1(0));//default set to per-pixel alpha	
 	}
 	else if((!win0_top) && (lcdc_dev->atv_layer_cnt >= 2) && (win1_alpha_en))
 	{
 		lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN | m_WIN1_ALPHA_EN,
 				v_WIN0_ALPHA_EN(0) | v_WIN1_ALPHA_EN(1));
+		lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN1_ALPHA_MODE | m_ALPHA_MODE_SEL0 |
+			m_ALPHA_MODE_SEL1,v_WIN1_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1) |
+			v_ALPHA_MODE_SEL1(0));//default set to per-pixel alpha	
 	}
 	else
 	{
 		lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN | m_WIN1_ALPHA_EN,
 				v_WIN0_ALPHA_EN(0) | v_WIN1_ALPHA_EN(0));
 	}
-	lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN0_ALPHA_MODE | m_ALPHA_MODE_SEL0 |
-			m_ALPHA_MODE_SEL1,v_WIN0_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1) |
-			v_ALPHA_MODE_SEL1(0));//default set to per-pixel alpha	
+	
 
 	return 0;
 }
 
+static int rk3188_lcdc_reg_update(struct rk_lcdc_device_driver *dev_drv)
+{
+	struct rk3188_lcdc_device *lcdc_dev = 
+		container_of(dev_drv,struct rk3188_lcdc_device,driver);
+	struct layer_par *win0 =  lcdc_dev->driver.layer_par[0];
+	struct layer_par *win1 =  lcdc_dev->driver.layer_par[1];
+	int timeout;
+	unsigned long flags;
+
+	spin_lock(&lcdc_dev->reg_lock);
+	if(likely(lcdc_dev->clk_on))
+	{
+		lcdc_msk_reg(lcdc_dev, SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(lcdc_dev->standby));
+		lcdc_msk_reg(lcdc_dev, SYS_CTRL, m_WIN0_EN | m_WIN1_EN | m_WIN0_RB_SWAP | m_WIN1_RB_SWAP, 
+			v_WIN0_EN(win0->state) | v_WIN1_EN(win1->state) | v_WIN0_RB_SWAP(win0->swap_rb) |
+			v_WIN1_RB_SWAP(win1->swap_rb));
+		lcdc_writel(lcdc_dev,WIN0_SCL_FACTOR_YRGB,v_X_SCL_FACTOR(win0->scale_yrgb_x) | 
+			v_Y_SCL_FACTOR(win0->scale_yrgb_y));
+		lcdc_writel(lcdc_dev,WIN0_SCL_FACTOR_CBR,v_X_SCL_FACTOR(win0->scale_cbcr_x) | 
+			v_Y_SCL_FACTOR(win0->scale_cbcr_y));
+		lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_FORMAT,v_WIN0_FORMAT(win0->fmt_cfg));		//(inf->video_mode==0)
+		lcdc_writel(lcdc_dev,WIN0_ACT_INFO,v_ACT_WIDTH(win0->xact) | v_ACT_HEIGHT(win0->yact));
+		lcdc_writel(lcdc_dev,WIN0_DSP_ST,v_DSP_STX(win0->dsp_stx) | v_DSP_STY(win0->dsp_sty));
+		lcdc_writel(lcdc_dev,WIN0_DSP_INFO,v_DSP_WIDTH(win0->xsize) | v_DSP_HEIGHT(win0->ysize));
+		lcdc_msk_reg(lcdc_dev,WIN_VIR,m_WIN0_VIR,v_WIN0_VIR_VAL(win0->vir_stride));
+		lcdc_writel(lcdc_dev,WIN0_YRGB_MST0, win0->y_addr);
+		lcdc_writel(lcdc_dev,WIN0_CBR_MST0, win0->uv_addr);
+		lcdc_writel(lcdc_dev,WIN1_DSP_INFO,v_DSP_WIDTH(win1->xsize) | v_DSP_HEIGHT(win1->ysize));
+		lcdc_writel(lcdc_dev,WIN1_DSP_ST,v_DSP_STX(win1->dsp_stx) | v_DSP_STY(win1->dsp_sty));
+		lcdc_msk_reg(lcdc_dev,WIN_VIR,m_WIN1_VIR,win1->vir_stride);
+		lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_FORMAT, v_WIN1_FORMAT(win1->fmt_cfg));
+		lcdc_writel(lcdc_dev,WIN1_MST,win1->y_addr);
+		rk3188_lcdc_alpha_cfg(lcdc_dev);
+		lcdc_cfg_done(lcdc_dev);
+		
+	}
+	spin_unlock(&lcdc_dev->reg_lock);
+	if(dev_drv->wait_fs)
+	{
+		spin_lock_irqsave(&dev_drv->cpl_lock,flags);
+		init_completion(&dev_drv->frame_done);
+		spin_unlock_irqrestore(&dev_drv->cpl_lock,flags);
+		timeout = wait_for_completion_timeout(&dev_drv->frame_done,msecs_to_jiffies(dev_drv->cur_screen->ft+5));
+		if(!timeout&&(!dev_drv->frame_done.done))
+		{
+			printk(KERN_ERR "wait for new frame start time out!\n");
+			return -ETIMEDOUT;
+		}
+	}
+	DBG(2,"%s for lcdc%d\n",__func__,lcdc_dev->id);
+	return 0;
+	
+}
 static int rk3188_lcdc_reg_resume(struct rk3188_lcdc_device *lcdc_dev)
 {
 	memcpy((u8*)lcdc_dev->regs, (u8*)lcdc_dev->regsbak, 0x84);
@@ -145,6 +291,7 @@ static int rk3188_lcdc_reg_resume(struct rk3188_lcdc_device *lcdc_dev)
 //enable layer,open:1,enable;0 disable
 static int win0_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 {
+	printk(KERN_INFO "Omegamoon >>> rk3188_lcdc.win0_open called");
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
 	{
@@ -153,7 +300,7 @@ static int win0_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 			if(!lcdc_dev->atv_layer_cnt)
 			{
 				printk(KERN_INFO "lcdc%d wakeup from standby!\n",lcdc_dev->id);
-				lcdc_msk_reg(lcdc_dev, SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(0));
+				lcdc_dev->standby = 0;
 			}
 			lcdc_dev->atv_layer_cnt++;
 		}
@@ -162,18 +309,12 @@ static int win0_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 			lcdc_dev->atv_layer_cnt--;
 		}
 		lcdc_dev->driver.layer_par[0]->state = open;
-
-		lcdc_msk_reg(lcdc_dev, SYS_CTRL, m_WIN0_EN, v_WIN0_EN(open));
-		#ifdef CONFIG_LCDC_OVERLAY_ENABLE
-		lcdc_msk_reg(lcdc_dev, DSP_CTRL0, m_ALPHA_MODE_SEL0 | m_WIN1_ALPHA_MODE, v_ALPHA_MODE_SEL0(1) | v_WIN1_ALPHA_MODE(1));
-		lcdc_msk_reg(lcdc_dev, ALPHA_CTRL, m_WIN1_ALPHA_EN, v_WIN1_ALPHA_EN(open));
-		#endif
 		if(!lcdc_dev->atv_layer_cnt)  //if no layer used,disable lcdc
 		{
 			printk(KERN_INFO "no layer of lcdc%d is used,go to standby!\n",lcdc_dev->id);
-			lcdc_msk_reg(lcdc_dev, SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(1));
+			lcdc_dev->standby = 1;
 		}
-		lcdc_cfg_done(lcdc_dev);	
+		//lcdc_cfg_done(lcdc_dev);	
 	}
 	spin_unlock(&lcdc_dev->reg_lock);
 
@@ -183,6 +324,7 @@ static int win0_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 
 static int win1_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 {
+	printk(KERN_INFO "Omegamoon >>> rk3188_lcdc.win1_open called");
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
 	{
@@ -191,7 +333,7 @@ static int win1_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 			if(!lcdc_dev->atv_layer_cnt)
 			{
 				printk(KERN_INFO "lcdc%d wakeup from standby!\n",lcdc_dev->id);
-				lcdc_msk_reg(lcdc_dev, SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(0));
+				lcdc_dev->standby = 0;
 			}
 			lcdc_dev->atv_layer_cnt++;
 		}
@@ -201,12 +343,10 @@ static int win1_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 		}
 		lcdc_dev->driver.layer_par[1]->state = open;
 		
-		lcdc_msk_reg(lcdc_dev, SYS_CTRL, m_WIN1_EN, v_WIN1_EN(open));
 		if(!lcdc_dev->atv_layer_cnt)  //if no layer used,disable lcdc
 		{
 			printk(KERN_INFO "no layer of lcdc%d is used,go to standby!\n",lcdc_dev->id);
-			lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev, SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(1));
+			lcdc_dev->standby = 1;
 		}
 		//lcdc_cfg_done(lcdc_dev);
 	}
@@ -215,6 +355,42 @@ static int win1_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
 	return 0;
 }
 
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+#ifdef OMEGAMOON_CHANGED // <<< Omegamoon - Added win2 support
+static int win2_open(struct rk3188_lcdc_device *lcdc_dev,bool open)
+{
+	spin_lock(&lcdc_dev->reg_lock);
+	if(likely(lcdc_dev->clk_on))
+	{
+		if(open)
+		{
+			if(!lcdc_dev->atv_layer_cnt)
+			{
+				printk(KERN_INFO "lcdc%d wakeup from standby!\n",lcdc_dev->id);
+				lcdc_dev->standby = 0;
+			}
+			lcdc_dev->atv_layer_cnt++;
+		}
+		else if((lcdc_dev->atv_layer_cnt > 0) && (!open))
+		{
+			lcdc_dev->atv_layer_cnt--;
+		}
+		lcdc_dev->driver.layer_par[2]->state = open;
+		
+		if(!lcdc_dev->atv_layer_cnt)  //if no layer used,disable lcdc
+		{
+			printk(KERN_INFO "no layer of lcdc%d is used,go to standby!\n",lcdc_dev->id);
+			lcdc_dev->standby = 1;
+		}
+		//lcdc_cfg_done(lcdc_dev);
+	}
+	spin_unlock(&lcdc_dev->reg_lock);
+
+	return 0;
+}
+#endif // OMEGAMOON_CHANGED
+   <<< Omegamoon */
+   
 static int rk3188_lcdc_open(struct rk_lcdc_device_driver *dev_drv,int layer_id,bool open)
 {
 	int i=0;
@@ -254,6 +430,12 @@ static int rk3188_lcdc_open(struct rk_lcdc_device_driver *dev_drv,int layer_id,b
 	{
 		win1_open(lcdc_dev,open);
 	}
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+	else if(layer_id == 2)
+	{
+		win2_open(lcdc_dev,open);
+	}
+   <<< Omegamoon */
 	else 
 	{
 		printk("invalid win number:%d\n",layer_id);
@@ -261,7 +443,13 @@ static int rk3188_lcdc_open(struct rk_lcdc_device_driver *dev_drv,int layer_id,b
 
 	if((!open) && (!lcdc_dev->atv_layer_cnt))  //when all layer closed,disable clk
 	{
+//#ifdef OMEGAMOON_CHANGED
+//		printk("Omegamoon >>> All layers closed, clk could be disabled, but keeping it anyway");
+//#else
+		lcdc_msk_reg(lcdc_dev,INT_STATUS,m_FS_INT_CLEAR,v_FS_INT_CLEAR(1));
+		rk3188_lcdc_reg_update(dev_drv);
 		rk3188_lcdc_clk_disable(lcdc_dev);
+//#endif
 	}
 
 	printk(KERN_INFO "lcdc%d win%d %s,atv layer:%d\n",
@@ -296,23 +484,30 @@ static int rk3188_lcdc_init(struct rk_lcdc_device_driver *dev_drv)
 		return -EINVAL;
 	}
 	if (IS_ERR(lcdc_dev->pd) || (IS_ERR(lcdc_dev->aclk)) ||(IS_ERR(lcdc_dev->dclk)) || (IS_ERR(lcdc_dev->hclk)))
-    	{
+    {
        		printk(KERN_ERR "failed to get lcdc%d clk source\n",lcdc_dev->id);
    	}
-	
-	rk3188_lcdc_clk_enable(lcdc_dev);
+	if(!support_uboot_display())
+	{
+		rk3188_lcdc_clk_enable(lcdc_dev);
+	}
+	else
+	{
+		lcdc_dev->clk_on = 1;
+	}
 
+	rk3188_lcdc_read_reg_defalut_cfg(lcdc_dev);
+	#if defined(CONFIG_ARCH_RK3188)
 	if(lcdc_dev->id == 0)
 	{
 		#if defined(CONFIG_LCDC0_IO_18V)
-		v = 0x40004000;               //bit14: 1,1.8v;0,3.3v
-		writel_relaxed(v,RK30_GRF_BASE + GRF_IO_CON4);
+			v = 0x40004000;               //bit14: 1,1.8v;0,3.3v
+			writel_relaxed(v,RK30_GRF_BASE + GRF_IO_CON4);
 		#else
-		v = 0x40000000;              
-		writel_relaxed(v,RK30_GRF_BASE + GRF_IO_CON4);
+			v = 0x40000000;
+			writel_relaxed(v,RK30_GRF_BASE + GRF_IO_CON4);
 		#endif
 	}
-
 	if(lcdc_dev->id == 1) //iomux for lcdc1
 	{
 		#if defined(CONFIG_LCDC1_IO_18V)
@@ -350,8 +545,8 @@ static int rk3188_lcdc_init(struct rk_lcdc_device_driver *dev_drv)
 		iomux_set(LCDC1_D21);
 		iomux_set(LCDC1_D22);
 		iomux_set(LCDC1_D23);
-		
 	}
+	#endif
 	lcdc_set_bit(lcdc_dev,SYS_CTRL,m_AUTO_GATING_EN);//eanble axi-clk auto gating for low power
 	//lcdc_set_bit(lcdc_dev,DSP_CTRL0,m_WIN0_TOP);
         if(dev_drv->cur_screen->dsp_lut)
@@ -370,8 +565,10 @@ static int rk3188_lcdc_init(struct rk_lcdc_device_driver *dev_drv)
         }
 	
 	lcdc_cfg_done(lcdc_dev);  // write any value to  REG_CFG_DONE let config become effective
-
-	rk3188_lcdc_clk_disable(lcdc_dev);
+	if((!support_uboot_display())||(dev_drv->screen_ctr_info->prop == EXTEND))
+	{
+		rk3188_lcdc_clk_disable(lcdc_dev);
+	}
 	
 	return 0;
 }
@@ -394,7 +591,6 @@ static void rk3188_lcdc_deint(struct rk3188_lcdc_device * lcdc_dev)
 	else   //clk already disabled 
 	{
 		spin_unlock(&lcdc_dev->reg_lock);
-		return 0;
 	}
 	mdelay(1);
 	
@@ -453,6 +649,8 @@ static int rk3188_load_screen(struct rk_lcdc_device_driver *dev_drv, bool initsc
 			break;
 		case OUT_P888:
 			face = OUT_P888;
+			lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_DITHER_DOWN_EN | m_DITHER_UP_EN,
+					v_DITHER_DOWN_EN(0) | v_DITHER_UP_EN(0));
 			break;
 		default:
 			printk("unsupported display output interface!\n");
@@ -483,7 +681,32 @@ static int rk3188_load_screen(struct rk_lcdc_device_driver *dev_drv, bool initsc
 			    v_VASP(screen->vsync_len + screen->upper_margin));
 	}
  	spin_unlock(&lcdc_dev->reg_lock);
-
+	#if defined(CONFIG_ARCH_RK3026)
+	if(dev_drv->screen0->type == SCREEN_RGB) //iomux for RGB screen
+	{
+		iomux_set(LCDC0_DCLK);
+		iomux_set(LCDC0_HSYNC);
+		iomux_set(LCDC0_VSYNC);
+		iomux_set(LCDC0_DEN);
+		iomux_set(LCDC0_D10);
+		iomux_set(LCDC0_D11);
+		iomux_set(LCDC0_D12);
+		iomux_set(LCDC0_D13);
+		iomux_set(LCDC0_D14);
+		iomux_set(LCDC0_D15);
+		iomux_set(LCDC0_D16);
+		iomux_set(LCDC0_D17);
+		if(!((dev_drv->screen0->face == OUT_P666)||(dev_drv->screen0->face == OUT_P565)))
+		{
+			iomux_set(LCDC0_D18);
+			iomux_set(LCDC0_D19);
+			iomux_set(LCDC0_D20);//iomux uart2 in
+			iomux_set(LCDC0_D21);//iomux uart2 out
+			iomux_set(LCDC0_D22);
+			iomux_set(LCDC0_D23);
+		}
+	}
+	#endif
 	ret = clk_set_rate(lcdc_dev->dclk, screen->pixclock);
 	if(ret)
 	{
@@ -499,11 +722,6 @@ static int rk3188_load_screen(struct rk_lcdc_device_driver *dev_drv, bool initsc
     	{
     		screen->init();
     	}
-
-	if(screen->sscreen_set)
-	{
-		screen->sscreen_set(screen,!initscreen);
-	}
 	
 	dev_info(dev_drv->dev,"%s for lcdc%d ok!\n",__func__,lcdc_dev->id);
 	return 0;
@@ -519,7 +737,7 @@ static  int win0_set_par(struct rk3188_lcdc_device *lcdc_dev,rk_screen *screen,
 	u32 ScaleCbrX = 0x1000;
 	u32 ScaleCbrY = 0x1000;
 	u8 fmt_cfg =0 ; //data format register config value
-	
+	char fmt[9] = "NULL";
 	xact = par->xact;			    //active (origin) picture window width/height		
 	yact = par->yact;
 	xvir = par->xvir;			   // virtual resolution		
@@ -563,64 +781,48 @@ static  int win0_set_par(struct rk3188_lcdc_device *lcdc_dev,rk_screen *screen,
 		break;
 	}
 
-	DBG(1,"lcdc%d>>%s>>format:%d>>>xact:%d>>yact:%d>>xsize:%d>>ysize:%d>>xvir:%d>>yvir:%d>>xpos:%d>>ypos:%d>>\n",
-		lcdc_dev->id,__func__,par->format,xact,yact,par->xsize,par->ysize,xvir,yvir,xpos,ypos);
+	DBG(1,"lcdc%d>>%s>>format:%s>>>xact:%d>>yact:%d>>xsize:%d>>ysize:%d>>xvir:%d>>yvir:%d>>xpos:%d>>ypos:%d>>\n",
+		lcdc_dev->id,__func__,get_format_string(par->format,fmt),xact,yact,par->xsize,par->ysize,xvir,yvir,xpos,ypos);
 	
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
 	{
-		lcdc_writel(lcdc_dev,WIN0_SCL_FACTOR_YRGB,v_X_SCL_FACTOR(ScaleYrgbX) | v_Y_SCL_FACTOR(ScaleYrgbY));
-		lcdc_writel(lcdc_dev,WIN0_SCL_FACTOR_CBR,v_X_SCL_FACTOR(ScaleCbrX) | v_Y_SCL_FACTOR(ScaleCbrY));
-		lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_FORMAT,v_WIN0_FORMAT(fmt_cfg));		//(inf->video_mode==0)
-		lcdc_writel(lcdc_dev,WIN0_ACT_INFO,v_ACT_WIDTH(xact) | v_ACT_HEIGHT(yact));
-		lcdc_writel(lcdc_dev,WIN0_DSP_ST,v_DSP_STX(xpos) | v_DSP_STY(ypos));
-		lcdc_writel(lcdc_dev,WIN0_DSP_INFO,v_DSP_WIDTH(par->xsize) | v_DSP_HEIGHT(par->ysize));
-		lcdc_msk_reg(lcdc_dev,WIN0_COLOR_KEY,m_COLOR_KEY_EN,v_COLOR_KEY_EN(0));
-		
+		par->scale_yrgb_x = ScaleYrgbX;
+		par->scale_yrgb_y = ScaleYrgbY;
+		par->scale_cbcr_x = ScaleCbrX;
+		par->scale_cbcr_y = ScaleCbrY;
+		par->fmt_cfg = fmt_cfg;
+		par->dsp_stx = xpos;
+		par->dsp_sty = ypos;
 		switch(par->format) 
 		{
 		case XBGR888:
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN0_VIR,v_ARGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_RB_SWAP,v_WIN0_RB_SWAP(1));
-			break;
 		case ABGR888:
-			lcdc_msk_reg(lcdc_dev,WIN_VIR,m_WIN0_VIR,v_ARGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(1));
-			//lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN0_ALPHA_MODE | m_ALPHA_MODE_SEL0 |
-			//	m_ALPHA_MODE_SEL1,v_WIN0_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1) |
-			//	v_ALPHA_MODE_SEL1(0));//default set to per-pixel alpha
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_RB_SWAP,v_WIN0_RB_SWAP(1));
+			par->vir_stride = v_ARGB888_VIRWIDTH(xvir);
+			par->swap_rb = 1;
 			break;
 		case ARGB888:
-			lcdc_msk_reg(lcdc_dev,WIN_VIR,m_WIN0_VIR,v_ARGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(1));
-			//lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN0_ALPHA_MODE | m_ALPHA_MODE_SEL0,
-			//	v_WIN0_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1));//default set to per-pixel alpha
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_RB_SWAP,v_WIN0_RB_SWAP(0));
+			par->vir_stride = v_ARGB888_VIRWIDTH(xvir);
+			par->swap_rb = 0;
 			break;
 		case RGB888:  //rgb888
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN0_VIR,v_RGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_RB_SWAP,v_WIN0_RB_SWAP(0));
+			par->vir_stride = v_RGB888_VIRWIDTH(xvir);
+			par->swap_rb = 0;
 			break;
 		case RGB565:  //rgb565
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN0_VIR,v_RGB565_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_RB_SWAP,v_WIN0_RB_SWAP(0));
+			par->vir_stride = v_RGB565_VIRWIDTH(xvir);
+			par->swap_rb = 0;
 			break;
 		case YUV422:
 		case YUV420:
 		case YUV444:
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN0_VIR,v_YUV_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN0_ALPHA_EN,v_WIN0_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN0_RB_SWAP,v_WIN0_RB_SWAP(0));
+			par->vir_stride = v_YUV_VIRWIDTH(xvir);
+			par->swap_rb = 0;
 			break;
 		default:
 			dev_err(lcdc_dev->driver.dev,"%s:un supported format!\n",__func__);
 			break;
 		}
-		lcdc_cfg_done(lcdc_dev);
 
 	}
 	spin_unlock(&lcdc_dev->reg_lock);
@@ -634,7 +836,7 @@ static int win1_set_par(struct rk3188_lcdc_device *lcdc_dev,rk_screen *screen,
 {
 	u32 xact, yact, xvir, yvir, xpos, ypos;
 	u8 fmt_cfg;
-
+	char fmt[9] = "NULL";
 	xact = par->xact;			
 	yact = par->yact;
 	xvir = par->xvir;		
@@ -643,60 +845,44 @@ static int win1_set_par(struct rk3188_lcdc_device *lcdc_dev,rk_screen *screen,
 	ypos = par->ypos+screen->upper_margin + screen->vsync_len;
 
 	
-	DBG(1,"lcdc%d>>%s>>format:%d>>>xact:%d>>yact:%d>>xsize:%d>>ysize:%d>>xvir:%d>>yvir:%d>>xpos:%d>>ypos:%d>>\n",
-		lcdc_dev->id,__func__,par->format,xact,yact,par->xsize,par->ysize,xvir,yvir,xpos,ypos);
+	DBG(1,"lcdc%d>>%s>>format:%s>>>xact:%d>>yact:%d>>xsize:%d>>ysize:%d>>xvir:%d>>yvir:%d>>xpos:%d>>ypos:%d>>\n",
+		lcdc_dev->id,__func__,get_format_string(par->format,fmt),xact,yact,par->xsize,par->ysize,xvir,yvir,xpos,ypos);
 
 	
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
 	{
-		
-		lcdc_writel(lcdc_dev, WIN1_DSP_INFO,v_DSP_WIDTH(par->xsize) | v_DSP_HEIGHT(par->ysize));
-		lcdc_writel(lcdc_dev, WIN1_DSP_ST,v_DSP_STX(xpos) | v_DSP_STY(ypos));
-		// disable win1 color key and set the color to black(rgb=0)
-		lcdc_msk_reg(lcdc_dev, WIN1_COLOR_KEY,m_COLOR_KEY_EN,v_COLOR_KEY_EN(0));
+		par->dsp_stx = xpos;
+		par->dsp_sty = ypos;
 		switch(par->format)
 		{
 		case XBGR888:
-			fmt_cfg = 0;
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN1_VIR,v_WIN1_ARGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN1_ALPHA_EN,v_WIN1_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_RB_SWAP,v_WIN1_RB_SWAP(1));
-			break;
 		case ABGR888:
 			fmt_cfg = 0;
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN1_VIR,v_WIN1_ARGB888_VIRWIDTH(xvir));
-			lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN1_ALPHA_EN,v_WIN1_ALPHA_EN(1));
-			lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN1_ALPHA_MODE | m_ALPHA_MODE_SEL0,
-				v_WIN1_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1));//default set to per-pixel alpha
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_RB_SWAP,v_WIN1_RB_SWAP(1));
+			par->vir_stride = v_WIN1_ARGB888_VIRWIDTH(xvir);
+			par->swap_rb = 1;
 			break;
 		case ARGB888:
 			fmt_cfg = 0;
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN1_VIR,v_WIN1_ARGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN1_ALPHA_EN,v_WIN1_ALPHA_EN(1));
-			//lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN1_ALPHA_MODE | m_ALPHA_MODE_SEL0,
-			//	v_WIN1_ALPHA_MODE(1) | v_ALPHA_MODE_SEL0(1));//default set to per-pixel alpha
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_RB_SWAP,v_WIN1_RB_SWAP(0));
+			par->vir_stride = v_WIN1_ARGB888_VIRWIDTH(xvir);
+			par->swap_rb = 0;
+			
 			break;
 		case RGB888:  //rgb888
 			fmt_cfg = 1;
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN1_VIR,v_WIN1_RGB888_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN1_ALPHA_EN,v_WIN1_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_RB_SWAP,v_WIN1_RB_SWAP(0));
-		 	//lcdc_msk_reg(lcdc_dev,SYS_CTRL1,m_W1_RGB_RB_SWAP,v_W1_RGB_RB_SWAP(1));
+			par->vir_stride = v_WIN1_RGB888_VIRWIDTH(xvir);
+			par->swap_rb = 0;
 			break;
 		case RGB565:  //rgb565
 			fmt_cfg = 2;
-			lcdc_msk_reg(lcdc_dev, WIN_VIR,m_WIN1_VIR,v_WIN1_RGB565_VIRWIDTH(xvir));
-			//lcdc_msk_reg(lcdc_dev,ALPHA_CTRL,m_WIN1_ALPHA_EN,v_WIN1_ALPHA_EN(0));
-			lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_RB_SWAP,v_WIN1_RB_SWAP(0));
+			par->vir_stride = v_WIN1_RGB565_VIRWIDTH(xvir);
+			par->swap_rb = 0;
 			break;
 		default:
 			dev_err(lcdc_dev->driver.dev,"%s:un supported format!\n",__func__);
 			break;
 		}
-		lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_WIN1_FORMAT, v_WIN1_FORMAT(fmt_cfg));
+		par->fmt_cfg = fmt_cfg;
 
 	}
 	spin_unlock(&lcdc_dev->reg_lock);
@@ -704,6 +890,65 @@ static int win1_set_par(struct rk3188_lcdc_device *lcdc_dev,rk_screen *screen,
 	return 0;
 }
 
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+static int win2_set_par(struct rk3188_lcdc_device *lcdc_dev,rk_screen *screen,
+			   struct layer_par *par )
+{
+	u32 xact, yact, xvir, yvir, xpos, ypos;
+	u8 fmt_cfg;
+	char fmt[9] = "NULL";
+	xact = par->xact;			
+	yact = par->yact;
+	xvir = par->xvir;		
+	yvir = par->yvir;
+	xpos = par->xpos+screen->left_margin + screen->hsync_len;
+	ypos = par->ypos+screen->upper_margin + screen->vsync_len;
+
+	
+	DBG(1,"lcdc%d>>%s>>format:%s>>>xact:%d>>yact:%d>>xsize:%d>>ysize:%d>>xvir:%d>>yvir:%d>>xpos:%d>>ypos:%d>>\n",
+		lcdc_dev->id,__func__,get_format_string(par->format,fmt),xact,yact,par->xsize,par->ysize,xvir,yvir,xpos,ypos);
+
+	
+	spin_lock(&lcdc_dev->reg_lock);
+	if(likely(lcdc_dev->clk_on))
+	{
+		par->dsp_stx = xpos;
+		par->dsp_sty = ypos;
+		switch(par->format)
+		{
+		case XBGR888:
+		case ABGR888:
+			fmt_cfg = 0;
+			par->vir_stride = v_WIN2_ARGB888_VIRWIDTH(xvir);
+			par->swap_rb = 1;
+			break;
+		case ARGB888:
+			fmt_cfg = 0;
+			par->vir_stride = v_WIN2_ARGB888_VIRWIDTH(xvir);
+			par->swap_rb = 0;
+			
+			break;
+		case RGB888:  //rgb888
+			fmt_cfg = 1;
+			par->vir_stride = v_WIN2_RGB888_VIRWIDTH(xvir);
+			par->swap_rb = 0;
+			break;
+		case RGB565:  //rgb565
+			fmt_cfg = 2;
+			par->vir_stride = v_WIN2_RGB565_VIRWIDTH(xvir);
+			par->swap_rb = 0;
+			break;
+		default:
+			dev_err(lcdc_dev->driver.dev,"%s:un supported format!\n",__func__);
+			break;
+		}
+		par->fmt_cfg = fmt_cfg;
+
+	}
+	spin_unlock(&lcdc_dev->reg_lock);
+	return 0;
+}
+   <<< Omegamoon */
 
 static int rk3188_lcdc_set_par(struct rk_lcdc_device_driver *dev_drv,int layer_id)
 {
@@ -726,6 +971,13 @@ static int rk3188_lcdc_set_par(struct rk_lcdc_device_driver *dev_drv,int layer_i
 	{
 		par = dev_drv->layer_par[1];
 		win1_set_par(lcdc_dev,screen,par);
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+	}
+	else if(layer_id == 2)
+	{
+		par = dev_drv->layer_par[2];
+        	win2_set_par(lcdc_dev,screen,par);
+   <<< Omegamoon */
 	}
 	else
 	{
@@ -747,19 +999,8 @@ static  int win0_display(struct rk3188_lcdc_device *lcdc_dev,struct layer_par *p
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
 	{
-		lcdc_writel(lcdc_dev, WIN0_YRGB_MST0, y_addr);
-		lcdc_writel(lcdc_dev, WIN0_CBR_MST0, uv_addr);	
-// #if defined(CONFIG_RK_HDMI)
-// #if defined(CONFIG_DUAL_LCDC_DUAL_DISP_IN_KERNEL)
-//        if(lcdc_dev->driver.screen_ctr_info->prop == EXTEND)
-//        {
-//            if(hdmi_get_hotplug() == HDMI_HPD_ACTIVED)
-//            {
-                lcdc_cfg_done(lcdc_dev);
-//            }
-//        }
-// #endif 
-// #endif
+		par->y_addr = y_addr;
+		par->uv_addr = uv_addr;
 	}
 	spin_unlock(&lcdc_dev->reg_lock);
 
@@ -778,23 +1019,34 @@ static  int win1_display(struct rk3188_lcdc_device *lcdc_dev,struct layer_par *p
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
 	{
-		lcdc_writel(lcdc_dev,WIN1_MST,y_addr);
-// #if defined(CONFIG_RK_HDMI)
-// #if defined(CONFIG_DUAL_LCDC_DUAL_DISP_IN_KERNEL)
-//        if(lcdc_dev->driver.screen_ctr_info->prop == EXTEND)
-//        {
-//            if(hdmi_get_hotplug() == HDMI_HPD_ACTIVED)
-//            {
-                lcdc_cfg_done(lcdc_dev);
-//            }
-//        }
-// #endif 
-// #endif
+		par->y_addr = y_addr;
 	}
 	spin_unlock(&lcdc_dev->reg_lock);
 
 	return 0;
 }
+
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+#ifdef OMEGAMOON_CHANGED
+static  int win2_display(struct rk3188_lcdc_device *lcdc_dev,struct layer_par *par )
+{
+	u32 y_addr;
+	u32 uv_addr;
+	y_addr = par->smem_start + par->y_offset;
+   	uv_addr = par->cbr_start + par->c_offset;
+	DBG(2,"lcdc%d>>%s>>y_addr:0x%x>>uv_addr:0x%x\n",lcdc_dev->id,__func__,y_addr,uv_addr);
+	
+	spin_lock(&lcdc_dev->reg_lock);
+	if(likely(lcdc_dev->clk_on))
+	{
+		par->y_addr = y_addr;
+	}
+	spin_unlock(&lcdc_dev->reg_lock);
+	
+	return 0;
+}
+#endif
+   <<< Omegamoon */
 
 static int rk3188_lcdc_pan_display(struct rk_lcdc_device_driver * dev_drv,int layer_id)
 {
@@ -802,9 +1054,10 @@ static int rk3188_lcdc_pan_display(struct rk_lcdc_device_driver * dev_drv,int la
 				container_of(dev_drv,struct rk3188_lcdc_device,driver);
 	struct layer_par *par = NULL;
 	rk_screen *screen = dev_drv->cur_screen;
-	unsigned long flags;
+#if defined(WAIT_FOR_SYNC)
 	int timeout;
-	
+	unsigned long flags;
+#endif
 	if(!screen)
 	{
 		dev_err(dev_drv->dev,"screen is null!\n");
@@ -819,6 +1072,13 @@ static int rk3188_lcdc_pan_display(struct rk_lcdc_device_driver * dev_drv,int la
 	{
 		par = dev_drv->layer_par[1];
 		win1_display(lcdc_dev,par);
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+	}
+	else if(layer_id == 2)
+	{
+		par = dev_drv->layer_par[2];
+        	win2_display(lcdc_dev,par);
+   <<< Omegamoon */
 	}
 	else 
 	{
@@ -828,8 +1088,12 @@ static int rk3188_lcdc_pan_display(struct rk_lcdc_device_driver * dev_drv,int la
 	if((dev_drv->first_frame))  //this is the first frame of the system ,enable frame start interrupt
 	{
 		dev_drv->first_frame = 0;
-		lcdc_msk_reg(lcdc_dev,INT_STATUS,m_FS_INT_CLEAR |m_FS_INT_EN ,
-			  v_FS_INT_CLEAR(1) | v_FS_INT_EN(1));
+		lcdc_msk_reg(lcdc_dev,INT_STATUS,m_HS_INT_CLEAR | m_HS_INT_EN |
+			m_FS_INT_CLEAR | m_FS_INT_EN | m_LF_INT_EN | m_LF_INT_CLEAR |
+			m_LF_INT_NUM | m_BUS_ERR_INT_CLEAR | m_BUS_ERR_INT_EN,
+			v_FS_INT_CLEAR(1) | v_FS_INT_EN(1) | v_HS_INT_CLEAR(1) |
+			v_HS_INT_EN(0) | v_LF_INT_CLEAR(1) | v_LF_INT_EN(1) |
+			v_LF_INT_NUM(screen->vsync_len + screen->upper_margin+screen->y_res -1));
 		lcdc_cfg_done(lcdc_dev);  // write any value to  REG_CFG_DONE let config become effective
 		 
 	}
@@ -853,6 +1117,12 @@ static int rk3188_lcdc_blank(struct rk_lcdc_device_driver *dev_drv,
 {
 	struct rk3188_lcdc_device * lcdc_dev = 
 		container_of(dev_drv,struct rk3188_lcdc_device,driver);
+	
+	/* Omegamoon >>> blanking completely suppressed for debugging purposes
+	if (blank_mode != FB_BLANK_UNBLANK) {
+		dev_info(dev_drv->dev, "Omegamoon >>> blanking suppressed\n");
+		return 0;
+	}*/
 	
 	spin_lock(&lcdc_dev->reg_lock);
 	if(likely(lcdc_dev->clk_on))
@@ -884,9 +1154,8 @@ static int rk3188_lcdc_ioctl(struct rk_lcdc_device_driver *dev_drv, unsigned int
 		container_of(dev_drv,struct rk3188_lcdc_device,driver);
 	u32 panel_size[2];
 	void __user *argp = (void __user *)arg;
-	int enable;
-	unsigned long flags;
-	int timeout;
+	struct color_key_cfg clr_key_cfg;
+	
 	switch(cmd)
 	{
 		case RK_FBIOGET_PANEL_SIZE:    //get panel size
@@ -895,24 +1164,13 @@ static int rk3188_lcdc_ioctl(struct rk_lcdc_device_driver *dev_drv, unsigned int
             		if(copy_to_user(argp, panel_size, 8)) 
 				return -EFAULT;
 			break;
-		case RK_FBIOSET_CONFIG_DONE:
-			if (copy_from_user(&(dev_drv->wait_fs),argp,sizeof(dev_drv->wait_fs)))
+		case RK_FBIOPUT_COLOR_KEY_CFG:
+			if(copy_from_user(&clr_key_cfg,argp,sizeof(struct color_key_cfg ))) 
 				return -EFAULT;
-			rk3188_lcdc_alpha_cfg(lcdc_dev);
-			lcdc_cfg_done(lcdc_dev);
-			if(dev_drv->wait_fs)
-			{
-				spin_lock_irqsave(&dev_drv->cpl_lock,flags);
-				init_completion(&dev_drv->frame_done);
-				spin_unlock_irqrestore(&dev_drv->cpl_lock,flags);
-				timeout = wait_for_completion_timeout(&dev_drv->frame_done,msecs_to_jiffies(dev_drv->cur_screen->ft+5));
-				if(!timeout&&(!dev_drv->frame_done.done))
-				{
-					printk(KERN_ERR "wait for new frame start time out!\n");
-					return -ETIMEDOUT;
-				}
-			}
+			lcdc_writel(lcdc_dev,WIN0_COLOR_KEY,clr_key_cfg.win0_color_key_cfg);
+			lcdc_writel(lcdc_dev,WIN1_COLOR_KEY,clr_key_cfg.win1_color_key_cfg);
 			break;
+			
 		default:
 			break;
 	}
@@ -921,7 +1179,7 @@ static int rk3188_lcdc_ioctl(struct rk_lcdc_device_driver *dev_drv, unsigned int
 
 static int rk3188_lcdc_early_suspend(struct rk_lcdc_device_driver *dev_drv)
 {
-	
+
 	struct rk3188_lcdc_device *lcdc_dev = 
 		container_of(dev_drv,struct rk3188_lcdc_device,driver);
 
@@ -934,6 +1192,7 @@ static int rk3188_lcdc_early_suspend(struct rk_lcdc_device_driver *dev_drv)
 	if(likely(lcdc_dev->clk_on))
 	{
 		lcdc_msk_reg(lcdc_dev,INT_STATUS,m_FS_INT_CLEAR,v_FS_INT_CLEAR(1));
+		lcdc_msk_reg(lcdc_dev,DSP_CTRL1,m_DSP_OUT_ZERO ,v_DSP_OUT_ZERO(1));
 		lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(1));
 		lcdc_cfg_done(lcdc_dev);
 		spin_unlock(&lcdc_dev->reg_lock);
@@ -943,9 +1202,18 @@ static int rk3188_lcdc_early_suspend(struct rk_lcdc_device_driver *dev_drv)
 		spin_unlock(&lcdc_dev->reg_lock);
 		return 0;
 	}
-
-	mdelay(25);
 	rk3188_lcdc_clk_disable(lcdc_dev);
+#if defined(CONFIG_ARCH_RK3026)
+	if(dev_drv->screen0->type != SCREEN_LVDS){
+		int gpio_dclk = iomux_mode_to_gpio(LCDC0_DCLK);
+		int ret = gpio_request(gpio_dclk,NULL);
+		if(unlikely(ret < 0)){
+			printk("Failed to request gpio:lcdc dclk\n");
+			return ret;
+		}
+		gpio_direction_output(gpio_dclk,GPIO_LOW);
+	}
+#endif
 	return 0;
 }
 
@@ -956,7 +1224,13 @@ static int rk3188_lcdc_early_resume(struct rk_lcdc_device_driver *dev_drv)
 	int i=0;
 	int __iomem *c;
 	int v;
-
+#if defined(CONFIG_ARCH_RK3026)
+	if(dev_drv->screen0->type != SCREEN_LVDS){
+		int gpio_dclk = iomux_mode_to_gpio(LCDC0_DCLK);
+		gpio_free(gpio_dclk);
+		iomux_set(LCDC0_DCLK);
+	}
+#endif
 	if(dev_drv->screen_ctr_info->io_enable) 		//power on
 		dev_drv->screen_ctr_info->io_enable();
 	
@@ -983,6 +1257,7 @@ static int rk3188_lcdc_early_resume(struct rk_lcdc_device_driver *dev_drv)
 	
 	if(lcdc_dev->atv_layer_cnt)
 	{
+		lcdc_msk_reg(lcdc_dev,DSP_CTRL1,m_DSP_OUT_ZERO ,v_DSP_OUT_ZERO(0));
 		lcdc_msk_reg(lcdc_dev, SYS_CTRL,m_LCDC_STANDBY,v_LCDC_STANDBY(0));
 		lcdc_cfg_done(lcdc_dev);
 	}
@@ -1012,7 +1287,6 @@ static int rk3188_lcdc_ovl_mgr(struct rk_lcdc_device_driver *dev_drv,int swap,bo
 		if(set)  //set overlay
 		{
 			lcdc_msk_reg(lcdc_dev,DSP_CTRL0,m_WIN0_TOP,v_WIN0_TOP(swap));
-			//lcdc_cfg_done(lcdc_dev);
 			ovl = swap;
 		}
 		else  //get overlay
@@ -1040,105 +1314,118 @@ static ssize_t rk3188_lcdc_get_disp_info(struct rk_lcdc_device_driver *dev_drv,c
 	char format_w1[9]= "NULL";
 	char status_w0[9]= "NULL";
 	char status_w1[9]= "NULL";
-        u32 fmt_id = lcdc_readl(lcdc_dev,SYS_CTRL);
-        u32 act_info,dsp_info,dsp_st,factor;
-        u16 xvir_w0,x_act_w0,y_act_w0,x_dsp_w0,y_dsp_w0,x_st_w0,y_st_w0,x_factor,y_factor;
+	u32 fmt_id , act_info,dsp_info,dsp_st,factor;
+	u16 xvir_w0,x_act_w0,y_act_w0,x_dsp_w0,y_dsp_w0,x_st_w0,y_st_w0,x_factor,y_factor;
 	u16 xvir_w1,x_dsp_w1,y_dsp_w1,x_st_w1,y_st_w1;
-        u16 x_scale,y_scale;
-        switch((fmt_id&m_WIN0_FORMAT)>>3)
+	u16 x_scale,y_scale,ovl;
+        spin_lock(&lcdc_dev->reg_lock);
+        if(lcdc_dev->clk_on)
         {
-                case 0:
-                        strcpy(format_w0,"ARGB888");
-                        break;
-                case 1:
-                        strcpy(format_w0,"RGB888");
-                        break;
-                case 2:
-                        strcpy(format_w0,"RGB565");
-                        break;
-                case 4:
-                        strcpy(format_w0,"YCbCr420");
-                        break;
-                case 5:
-                        strcpy(format_w0,"YCbCr422");
-                        break;
-                case 6:
-                        strcpy(format_w0,"YCbCr444");
-                        break;
-                default:
-                        strcpy(format_w0,"invalid\n");
-                        break;
-        }
+                fmt_id = lcdc_readl(lcdc_dev,SYS_CTRL);
+	        ovl = lcdc_read_bit(lcdc_dev,DSP_CTRL0,m_WIN0_TOP);
+	
+                switch((fmt_id&m_WIN0_FORMAT)>>3)
+                {
+                        case 0:
+                                strcpy(format_w0,"ARGB888");
+                                break;
+                        case 1:
+                                strcpy(format_w0,"RGB888");
+                                break;
+                        case 2:
+                                strcpy(format_w0,"RGB565");
+                                break;
+                        case 4:
+                                strcpy(format_w0,"YCbCr420");
+                                break;
+                        case 5:
+                                strcpy(format_w0,"YCbCr422");
+                                break;
+                        case 6:
+                                strcpy(format_w0,"YCbCr444");
+                                break;
+                        default:
+                                strcpy(format_w0,"invalid\n");
+                                break;
+                }
 
-	 switch((fmt_id&m_WIN1_FORMAT)>>6)
+	        switch((fmt_id&m_WIN1_FORMAT)>>6)
+                {
+                        case 0:
+                                strcpy(format_w1,"ARGB888");
+                                break;
+                        case 1:
+                                strcpy(format_w1,"RGB888");
+                                break;
+                        case 2:
+                                strcpy(format_w1,"RGB565");
+                                break;
+                        case 4:
+                                strcpy(format_w1,"8bpp");
+                                break;
+                        case 5:
+	                        strcpy(format_w1,"4bpp");
+	                        break;
+                        case 6:
+                                strcpy(format_w1,"2bpp");
+                                break;
+                        case 7:
+                                strcpy(format_w1,"1bpp");
+                                break;
+                        default:
+                                strcpy(format_w1,"invalid\n");
+                                break;
+                }
+
+	        if(fmt_id&m_WIN0_EN)
+	        {
+		        strcpy(status_w0,"enabled");
+	        }
+	        else
+	        {
+		        strcpy(status_w0,"disabled");
+	        }
+
+	        if((fmt_id&m_WIN1_EN)>>1)
+	        {
+		        strcpy(status_w1,"enabled");
+	        }
+	        else
+	        {
+		        strcpy(status_w1,"disabled");
+	        }
+
+                xvir_w0 = lcdc_readl(lcdc_dev,WIN_VIR)&0x1fff;
+                act_info = lcdc_readl(lcdc_dev,WIN0_ACT_INFO);
+                dsp_info = lcdc_readl(lcdc_dev,WIN0_DSP_INFO);
+                dsp_st = lcdc_readl(lcdc_dev,WIN0_DSP_ST);
+                factor = lcdc_readl(lcdc_dev,WIN0_SCL_FACTOR_YRGB);
+                x_act_w0= (act_info&0x1fff) + 1;
+                y_act_w0= ((act_info>>16)&0x1fff) + 1;
+                x_dsp_w0= (dsp_info&0x7ff) + 1;
+                y_dsp_w0= ((dsp_info>>16)&0x7ff) + 1;
+	        x_st_w0 = dsp_st&0xffff;
+                y_st_w0 = dsp_st>>16;
+	        x_factor = factor&0xffff;
+                y_factor = factor>>16;
+                x_scale = 4096*100/x_factor;
+                y_scale = 4096*100/y_factor;
+
+	        xvir_w1= (lcdc_readl(lcdc_dev,WIN_VIR)>> 16)&0x1fff;
+                dsp_info = lcdc_readl(lcdc_dev,WIN1_DSP_INFO);
+                dsp_st = lcdc_readl(lcdc_dev,WIN1_DSP_ST);
+                x_dsp_w1= (dsp_info&0x7ff) + 1;
+                y_dsp_w1= ((dsp_info>>16)&0x7ff) + 1;
+	        x_st_w1 = dsp_st&0xffff;
+                y_st_w1 = dsp_st>>16;
+        }
+        else
         {
-                case 0:
-                        strcpy(format_w1,"ARGB888");
-                        break;
-                case 1:
-                        strcpy(format_w1,"RGB888");
-                        break;
-                case 2:
-                        strcpy(format_w1,"RGB565");
-                        break;
-                case 4:
-                        strcpy(format_w1,"8bpp");
-                        break;
-                case 5:
-	                strcpy(format_w1,"4bpp");
-	                break;
-                case 6:
-                        strcpy(format_w1,"2bpp");
-                        break;
-                case 7:
-                        strcpy(format_w1,"1bpp");
-                        break;
-                default:
-                        strcpy(format_w1,"invalid\n");
-                        break;
+                spin_unlock(&lcdc_dev->reg_lock);
+                return  -EPERM;
         }
-
-	if(fmt_id&m_WIN0_EN)
-	{
-		strcpy(status_w0,"enabled");
-	}
-	else
-	{
-		strcpy(status_w0,"disabled");
-	}
-
-	if((fmt_id&m_WIN1_EN)>>1)
-	{
-		strcpy(status_w1,"enabled");
-	}
-	else
-	{
-		strcpy(status_w1,"disabled");
-	}
-
-        xvir_w0 = lcdc_readl(lcdc_dev,WIN_VIR)&0x1fff;
-        act_info = lcdc_readl(lcdc_dev,WIN0_ACT_INFO);
-        dsp_info = lcdc_readl(lcdc_dev,WIN0_DSP_INFO);
-        dsp_st = lcdc_readl(lcdc_dev,WIN0_DSP_ST);
-        factor = lcdc_readl(lcdc_dev,WIN0_SCL_FACTOR_YRGB);
-        x_act_w0= (act_info&0x1fff) + 1;
-        y_act_w0= ((act_info>>16)&0x1fff) + 1;
-        x_dsp_w0= (dsp_info&0x7ff) + 1;
-        y_dsp_w0= ((dsp_info>>16)&0x7ff) + 1;
-	x_st_w0 = dsp_st&0xffff;
-        y_st_w0 = dsp_st>>16;
-	x_factor = factor&0xffff;
-        y_factor = factor>>16;
-        x_scale = 4096*100/x_factor;
-        y_scale = 4096*100/y_factor;
-
-	xvir_w1= (lcdc_readl(lcdc_dev,WIN_VIR)>> 16)&0x1fff;
-        dsp_info = lcdc_readl(lcdc_dev,WIN1_DSP_INFO);
-        dsp_st = lcdc_readl(lcdc_dev,WIN1_DSP_ST);
-        x_dsp_w1= (dsp_info&0x7ff) + 1;
-        y_dsp_w1= ((dsp_info>>16)&0x7ff) + 1;
-	x_st_w1 = dsp_st&0xffff;
-        y_st_w1 = dsp_st>>16;
+        spin_unlock(&lcdc_dev->reg_lock);
+      
         return snprintf(buf,PAGE_SIZE,
 		"win0:%s\n"
 		"xvir:%d\n"
@@ -1150,14 +1437,18 @@ static ssize_t rk3188_lcdc_get_disp_info(struct rk_lcdc_device_driver *dev_drv,c
 		"y_st:%d\n"
 		"x_scale:%d.%d\n"
 		"y_scale:%d.%d\n"
-		"format:%s\n\n"
+		"format:%s\n"
+		"YRGB buffer addr:0x%08x\n"
+		"CBR buffer addr:0x%08x\n\n"
 		"win1:%s\n"
 		"xvir:%d\n"
 		"xdsp:%d\n"
 		"ydsp:%d\n"
 		"x_st:%d\n"
 		"y_st:%d\n"
-		"format:%s\n",
+		"format:%s\n"
+		"YRGB buffer addr:0x%08x\n"
+		"overlay:%s\n",
 		status_w0,
                 xvir_w0,
                 x_act_w0,
@@ -1171,13 +1462,17 @@ static ssize_t rk3188_lcdc_get_disp_info(struct rk_lcdc_device_driver *dev_drv,c
                 y_scale/100,
                 y_scale%100,
                 format_w0,
+                lcdc_readl(lcdc_dev,WIN0_YRGB_MST0),
+		lcdc_readl(lcdc_dev,WIN0_CBR_MST0),
                 status_w1,
                 xvir_w1,
                 x_dsp_w1,
                 y_dsp_w1,
                 x_st_w1,
                 y_st_w1,
-                format_w1);
+                format_w1,
+                lcdc_readl(lcdc_dev,WIN1_MST),
+                ovl ? "win0 on the top of win1\n":"win1 on the top of win0\n");
 
 }
 
@@ -1239,25 +1534,36 @@ static int rk3188_fb_layer_remap(struct rk_lcdc_device_driver *dev_drv,
 
 static int rk3188_fb_get_layer(struct rk_lcdc_device_driver *dev_drv,const char *id)
 {
-	int layer_id = 0;
-	mutex_lock(&dev_drv->fb_win_id_mutex);
-	if(!strcmp(id,"fb0")||!strcmp(id,"fb2"))
-	{
-		if(dev_drv->overlay)
-			layer_id = dev_drv->fb1_win_id;
-		else
-			layer_id = dev_drv->fb0_win_id;
-	}
-	else if(!strcmp(id,"fb1")||!strcmp(id,"fb3"))
-	{
-		if(dev_drv->overlay)
-			layer_id = dev_drv->fb0_win_id;
-		else
-			layer_id = dev_drv->fb1_win_id;
-	}
-	mutex_unlock(&dev_drv->fb_win_id_mutex);
-	
-	return  layer_id;
+       int layer_id = 0;
+       mutex_lock(&dev_drv->fb_win_id_mutex);
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+#ifndef OMEGAMOON_CHANGED
+       if(!strcmp(id,"fb0")||!strcmp(id,"fb3"))
+       {
+               layer_id = dev_drv->fb0_win_id;
+       }
+       else if(!strcmp(id,"fb1")||!strcmp(id,"fb4"))
+       {
+               layer_id = dev_drv->fb1_win_id;
+       }
+       else if(!strcmp(id,"fb2")||!strcmp(id,"fb5"))
+       {
+               layer_id = dev_drv->fb2_win_id;
+       }
+#else
+   <<< Omegamoon */
+       if(!strcmp(id,"fb0")||!strcmp(id,"fb2"))
+       {
+               layer_id = dev_drv->fb0_win_id;
+       }
+       else if(!strcmp(id,"fb1")||!strcmp(id,"fb3"))
+       {
+               layer_id = dev_drv->fb1_win_id;
+       }
+//#endif
+       mutex_unlock(&dev_drv->fb_win_id_mutex);
+
+       return  layer_id;
 }
 
 static int rk3188_set_dsp_lut(struct rk_lcdc_device_driver *dev_drv,int *lut)
@@ -1293,6 +1599,58 @@ static int rk3188_set_dsp_lut(struct rk_lcdc_device_driver *dev_drv,int *lut)
 	return ret;
 }
 
+static int rk3188_lcdc_dpi_open(struct rk_lcdc_device_driver *dev_drv,bool open)
+{
+	struct rk3188_lcdc_device *lcdc_dev =
+			container_of(dev_drv,struct rk3188_lcdc_device,driver);
+	lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_DIRECT_PATCH_EN,v_DIRECT_PATCH_EN(open));
+	lcdc_cfg_done(lcdc_dev);
+	return 0;
+}
+
+static int rk3188_lcdc_dpi_layer_sel(struct rk_lcdc_device_driver *dev_drv,int layer_id)
+{
+	struct rk3188_lcdc_device *lcdc_dev =
+			container_of(dev_drv,struct rk3188_lcdc_device,driver);
+	lcdc_msk_reg(lcdc_dev,SYS_CTRL,m_DIRECT_PATH_LAY_SEL,v_DIRECT_PATH_LAY_SEL(layer_id));
+	lcdc_cfg_done(lcdc_dev);
+	return 0;
+
+}
+static int rk3188_lcdc_dpi_status(struct rk_lcdc_device_driver *dev_drv)
+{
+	struct rk3188_lcdc_device *lcdc_dev =
+			container_of(dev_drv,struct rk3188_lcdc_device,driver);
+	int ovl = lcdc_read_bit(lcdc_dev,SYS_CTRL,m_DIRECT_PATCH_EN);
+	return ovl;
+}
+
+int rk3188_lcdc_poll_vblank(struct rk_lcdc_device_driver * dev_drv)
+{
+	struct rk3188_lcdc_device *lcdc_dev = 
+				container_of(dev_drv,struct rk3188_lcdc_device,driver);    
+        u32 int_reg ;
+	int ret;
+	//spin_lock(&lcdc_dev->reg_lock);
+	if(lcdc_dev->clk_on)
+	{
+		int_reg = lcdc_readl(lcdc_dev,INT_STATUS);
+	        if(int_reg & m_LF_INT_STA)
+	        {
+	              lcdc_msk_reg(lcdc_dev, INT_STATUS, m_LF_INT_CLEAR,v_LF_INT_CLEAR(1));              
+	              ret =  RK_LF_STATUS_FC;
+	        }
+	        else
+	             ret = RK_LF_STATUS_FR;
+	}
+	else
+	{
+		ret = RK_LF_STATUS_NC;
+	}	
+	//spin_unlock(&lcdc_dev->reg_lock);
+
+	return ret;
+}
 
 static struct layer_par lcdc_layer[] = {
 	[0] = {
@@ -1305,6 +1663,13 @@ static struct layer_par lcdc_layer[] = {
 		.id		= 1,
 		.support_3d	= false,
 	},
+/* >>> Omegamoon - Used in the Mali solution on RK3066
+	[2] = {
+		.name  		= "win2",
+		.id		= 2,
+		.support_3d	= false,
+	},
+   <<< Omegamoon */
 };
 
 static struct rk_lcdc_device_driver lcdc_driver = {
@@ -1316,6 +1681,7 @@ static struct rk_lcdc_device_driver lcdc_driver = {
 	.load_screen		= rk3188_load_screen,
 	.set_par       		= rk3188_lcdc_set_par,
 	.pan_display            = rk3188_lcdc_pan_display,
+	.lcdc_reg_update	= rk3188_lcdc_reg_update,
 	.blank         		= rk3188_lcdc_blank,
 	.ioctl			= rk3188_lcdc_ioctl,
 	.suspend		= rk3188_lcdc_early_suspend,
@@ -1327,6 +1693,10 @@ static struct rk_lcdc_device_driver lcdc_driver = {
 	.fb_get_layer           = rk3188_fb_get_layer,
 	.fb_layer_remap         = rk3188_fb_layer_remap,
 	.set_dsp_lut            = rk3188_set_dsp_lut,
+	.poll_vblank		= rk3188_lcdc_poll_vblank,
+	.dpi_open               = rk3188_lcdc_dpi_open,
+	.dpi_layer_sel          = rk3188_lcdc_dpi_layer_sel,
+	.dpi_status          	= rk3188_lcdc_dpi_status,
 };
 
 static irqreturn_t rk3188_lcdc_isr(int irq, void *dev_id)
@@ -1334,18 +1704,26 @@ static irqreturn_t rk3188_lcdc_isr(int irq, void *dev_id)
 	struct rk3188_lcdc_device *lcdc_dev = 
 				(struct rk3188_lcdc_device *)dev_id;
 	ktime_t timestamp = ktime_get();
-	
-	lcdc_msk_reg(lcdc_dev, INT_STATUS, m_FS_INT_CLEAR, v_FS_INT_CLEAR(1));
-
-	if(lcdc_dev->driver.wait_fs)  //three buffer ,no need to wait for sync
+	u32 int_reg = lcdc_readl(lcdc_dev,INT_STATUS);
+                
+	if(int_reg & m_FS_INT_STA)
 	{
-		spin_lock(&(lcdc_dev->driver.cpl_lock));
-		complete(&(lcdc_dev->driver.frame_done));
-		spin_unlock(&(lcdc_dev->driver.cpl_lock));
+		timestamp = ktime_get();
+		lcdc_msk_reg(lcdc_dev, INT_STATUS, m_FS_INT_CLEAR,v_FS_INT_CLEAR(1));
+		if(lcdc_dev->driver.wait_fs)  //three buffer ,no need to wait for sync
+		{
+			spin_lock(&(lcdc_dev->driver.cpl_lock));
+			complete(&(lcdc_dev->driver.frame_done));
+			spin_unlock(&(lcdc_dev->driver.cpl_lock));
+		}
+		lcdc_dev->driver.vsync_info.timestamp = timestamp;
+		wake_up_interruptible_all(&lcdc_dev->driver.vsync_info.wait);
+		
 	}
-	lcdc_dev->driver.vsync_info.timestamp = timestamp;
-	wake_up_interruptible_all(&lcdc_dev->driver.vsync_info.wait);
-	
+	else if(int_reg & m_LF_INT_STA)
+	{
+		lcdc_msk_reg(lcdc_dev, INT_STATUS, m_LF_INT_CLEAR,v_LF_INT_CLEAR(1));
+	}
 	return IRQ_HANDLED;
 }
 
@@ -1370,7 +1748,9 @@ static int __devinit rk3188_lcdc_probe(struct platform_device *pdev)
 	struct rk3188_lcdc_device *lcdc_dev = NULL;
 	struct device *dev = &pdev->dev;
 	rk_screen *screen;
+#if defined(CONFIG_ONE_LCDC_DUAL_OUTPUT_INF)
 	rk_screen *screen1;
+#endif
 	struct rk29fb_info *screen_ctr_info;
 	struct resource *res = NULL;
 	struct resource *mem = NULL;
@@ -1404,7 +1784,7 @@ static int __devinit rk3188_lcdc_probe(struct platform_device *pdev)
 	}
 	screen->lcdc_id = lcdc_dev->id;
 	screen->screen_id = 0;
-#if defined(CONFIG_ONE_LCDC_DUAL_OUTPUT_INF)&& defined(CONFIG_RK610_LVDS)
+#if defined(CONFIG_ONE_LCDC_DUAL_OUTPUT_INF)&&  (defined(CONFIG_RK610_LVDS) || defined(CONFIG_RK616_LVDS))
 	screen1 =  kzalloc(sizeof(rk_screen), GFP_KERNEL);
 	if(!screen1)
 	{
@@ -1414,7 +1794,7 @@ static int __devinit rk3188_lcdc_probe(struct platform_device *pdev)
 	}
 	screen1->lcdc_id = 1;
 	screen1->screen_id = 1;
-	printk("use lcdc%d and rk610 implemention dual display!\n",lcdc_dev->id);
+	printk("use lcdc%d and jetta implemention dual display!\n",lcdc_dev->id);
 	
 #endif
 	
@@ -1454,7 +1834,7 @@ static int __devinit rk3188_lcdc_probe(struct platform_device *pdev)
 	printk("lcdc%d:reg_phy_base = 0x%08x,reg_vir_base:0x%p\n",pdev->id,lcdc_dev->reg_phy_base, lcdc_dev->regs);
 	lcdc_dev->driver.dev = dev;
 	lcdc_dev->driver.screen0 = screen;
-#if defined(CONFIG_ONE_LCDC_DUAL_OUTPUT_INF)&& defined(CONFIG_RK610_LVDS)
+#if defined(CONFIG_ONE_LCDC_DUAL_OUTPUT_INF)&& (defined(CONFIG_RK610_LVDS) || defined(CONFIG_RK616_LVDS))
 	lcdc_dev->driver.screen1 = screen1;
 #endif
 	lcdc_dev->driver.cur_screen = screen;
@@ -1520,6 +1900,10 @@ err0:
 
 static int __devexit rk3188_lcdc_remove(struct platform_device *pdev)
 {
+	struct rk3188_lcdc_device *lcdc_dev = platform_get_drvdata(pdev);
+	rk3188_lcdc_deint(lcdc_dev);	
+	rk_fb_unregister(&(lcdc_dev->driver));
+
 	return 0;
 }
 
@@ -1530,10 +1914,8 @@ static void rk3188_lcdc_shutdown(struct platform_device *pdev)
 		lcdc_dev->driver.cur_screen->standby(1);
 	if(lcdc_dev->driver.screen_ctr_info->io_disable) //power off the screen if necessary
 		lcdc_dev->driver.screen_ctr_info->io_disable();
-	if(lcdc_dev->driver.cur_screen->sscreen_set) //turn off  lvds if necessary
-		lcdc_dev->driver.cur_screen->sscreen_set(lcdc_dev->driver.cur_screen , 0);
 	rk3188_lcdc_deint(lcdc_dev);
-	rk_fb_unregister(&(lcdc_dev->driver));	
+	//rk_fb_unregister(&(lcdc_dev->driver));	
 }
 static struct platform_driver rk3188_lcdc_driver = {
 	.probe		= rk3188_lcdc_probe,

@@ -22,7 +22,12 @@
 #include <linux/delay.h>
 #include <linux/hardirq.h>
 #include <plat/efuse.h>
+// Omegamoon: Add support for rk3066 as well in here
+#ifdef CONFIG_ARCH_RK30XX
+#include "../mach-rk3188/include/mach/cru-rk3188.h"  // Galland: apparently valid for rk30 too
+#else
 #include <mach/cru.h>
+#endif
 #include <mach/iomux.h>
 #include <mach/clock.h>
 #include <mach/pmu.h>
@@ -3384,7 +3389,6 @@ static void cpu_axi_init(void)
 			break;
 
 		default:
-		    cpu_div_rate = 150 * MHZ;
 			aclk_cpu_rate = 150 * MHZ;
 			hclk_cpu_rate = 150 * MHZ;
 			pclk_cpu_rate = 75 * MHZ;
@@ -3662,6 +3666,17 @@ void __init _rk30_clock_data_init(unsigned long gpll, unsigned long cpll, int fl
 	//cru_writel(0x07000000,CRU_MISC_CON);
 
 }
+#ifdef CONFIG_ARCH_RK30XX
+extern int rk_dvfs_init(void);
+
+void __init rk30_clock_data_init(unsigned long gpll, unsigned long cpll, u32 flags)
+{
+	CLKDATA_DBG("clock: gpll %lu cpll %lu flags 0x%x con2 0x%x/0x%x\n", 
+			gpll, cpll, flags, cru_readl(PLL_CONS(DPLL_ID, 2)), cru_readl(PLL_CONS(CPLL_ID, 2)));
+	_rk30_clock_data_init(gpll, cpll, flags);
+	rk_dvfs_init();
+}
+#else
 extern int rk3188_dvfs_init(void);
 
 void __init rk30_clock_data_init(unsigned long gpll, unsigned long cpll, u32 flags)
@@ -3671,6 +3686,7 @@ void __init rk30_clock_data_init(unsigned long gpll, unsigned long cpll, u32 fla
 	_rk30_clock_data_init(gpll, cpll, flags);
 	rk3188_dvfs_init();
 }
+#endif
 #define STR_UBOOT_DISPLAY	"fastboot"
 static int __init bootloader_setup(char *str)
 {

@@ -245,7 +245,7 @@ static inline uint32_t SET_DEBUG_LEVEL( const uint32_t _new )
 
 #endif /*DEBUG*/
 
-#if 1
+#if 0
 /**
  * Print an Error message.
  */

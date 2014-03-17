@@ -33,7 +33,7 @@
 
 /* This files gather functions specifics to: r520,rv530,rv560,rv570,r580 */
 
-static int r520_mc_wait_for_idle(struct radeon_device *rdev)
+int r520_mc_wait_for_idle(struct radeon_device *rdev)
 {
 	unsigned i;
 	uint32_t tmp;
@@ -187,7 +187,19 @@ static int r520_startup(struct radeon_device *rdev)
 	if (r)
 		return r;
 
+	r = radeon_fence_driver_start_ring(rdev, RADEON_RING_TYPE_GFX_INDEX);
+	if (r) {
+		dev_err(rdev->dev, "failed initializing CP fences (%d).\n", r);
+		return r;
+	}
+
 	/* Enable IRQ */
+	if (!rdev->irq.installed) {
+		r = radeon_irq_kms_init(rdev);
+		if (r)
+			return r;
+	}
+
 	rs600_irq_set(rdev);
 	rdev->config.r300.hdp_cntl = RREG32(RADEON_HOST_PATH_CNTL);
 	/* 1M ring buffer */
@@ -196,9 +208,15 @@ static int r520_startup(struct radeon_device *rdev)
 		dev_err(rdev->dev, "failed initializing CP (%d).\n", r);
 		return r;
 	}
-	r = r100_ib_init(rdev);
+
+	r = radeon_ib_pool_start(rdev);
+	if (r)
+		return r;
+
+	r = radeon_ib_test(rdev, RADEON_RING_TYPE_GFX_INDEX, &rdev->ring[RADEON_RING_TYPE_GFX_INDEX]);
 	if (r) {
-		dev_err(rdev->dev, "failed initializing IB (%d).\n", r);
+		dev_err(rdev->dev, "failed testing IB (%d).\n", r);
+		rdev->accel_working = false;
 		return r;
 	}
 	return 0;
@@ -206,6 +224,8 @@ static int r520_startup(struct radeon_device *rdev)
 
 int r520_resume(struct radeon_device *rdev)
 {
+	int r;
+
 	/* Make sur GART are not working */
 	if (rdev->flags & RADEON_IS_PCIE)
 		rv370_pcie_gart_disable(rdev);
@@ -223,7 +243,13 @@ int r520_resume(struct radeon_device *rdev)
 	rv515_clock_startup(rdev);
 	/* Initialize surface registers */
 	radeon_surface_init(rdev);
-	return r520_startup(rdev);
+
+	rdev->accel_working = true;
+	r = r520_startup(rdev);
+	if (r) {
+		rdev->accel_working = false;
+	}
+	return r;
 }
 
 int r520_init(struct radeon_device *rdev)
@@ -281,9 +307,6 @@ int r520_init(struct radeon_device *rdev)
 	r = radeon_fence_driver_init(rdev);
 	if (r)
 		return r;
-	r = radeon_irq_kms_init(rdev);
-	if (r)
-		return r;
 	/* Memory manager */
 	r = radeon_bo_init(rdev);
 	if (r)
@@ -292,7 +315,14 @@ int r520_init(struct radeon_device *rdev)
 	if (r)
 		return r;
 	rv515_set_safe_registers(rdev);
+
+	r = radeon_ib_pool_init(rdev);
 	rdev->accel_working = true;
+	if (r) {
+		dev_err(rdev->dev, "IB initialization failed (%d).\n", r);
+		rdev->accel_working = false;
+	}
+
 	r = r520_startup(rdev);
 	if (r) {
 		/* Somethings want wront with the accel init stop accel */

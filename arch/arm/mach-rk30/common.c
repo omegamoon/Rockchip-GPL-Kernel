@@ -1,5 +1,6 @@
 #include <linux/clk.h>
 #include <linux/cpufreq.h>
+#include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -121,40 +122,6 @@ static void __init rk30_l2_cache_init(void)
 
 static int boot_mode;
 
-static const char *boot_flag_name(u32 flag)
-{
-	flag -= SYS_KERNRL_REBOOT_FLAG;
-	switch (flag) {
-	case BOOT_NORMAL: return "NORMAL";
-	case BOOT_LOADER: return "LOADER";
-	case BOOT_MASKROM: return "MASKROM";
-	case BOOT_RECOVER: return "RECOVER";
-	case BOOT_NORECOVER: return "NORECOVER";
-	case BOOT_SECONDOS: return "SECONDOS";
-	case BOOT_WIPEDATA: return "WIPEDATA";
-	case BOOT_WIPEALL: return "WIPEALL";
-	case BOOT_CHECKIMG: return "CHECKIMG";
-	case BOOT_FASTBOOT: return "FASTBOOT";
-	default: return "";
-	}
-}
-
-static const char *boot_mode_name(u32 mode)
-{
-	switch (mode) {
-	case BOOT_MODE_NORMAL: return "NORMAL";
-	case BOOT_MODE_FACTORY2: return "FACTORY2";
-	case BOOT_MODE_RECOVERY: return "RECOVERY";
-	case BOOT_MODE_CHARGE: return "CHARGE";
-	case BOOT_MODE_POWER_TEST: return "POWER_TEST";
-	case BOOT_MODE_OFFMODE_CHARGING: return "OFFMODE_CHARGING";
-	case BOOT_MODE_REBOOT: return "REBOOT";
-	case BOOT_MODE_PANIC: return "PANIC";
-	case BOOT_MODE_WATCHDOG: return "WATCHDOG";
-	default: return "";
-	}
-}
-
 static void __init rk30_boot_mode_init(void)
 {
 	u32 boot_flag = readl_relaxed(RK30_PMU_BASE + PMU_SYS_REG0);
@@ -219,6 +186,9 @@ void __init rk30_map_io(void)
 	clk_disable_unused();
 	rk30_iomux_init();
 	rk30_boot_mode_init();
+#if defined(CONFIG_EMMC_IO_3_3V)
+	grf_set_io_power_domain_voltage(IO_PD_FLASH, IO_PD_VOLTAGE_3_3V);
+#endif
 }
 
 static __init u32 rk30_get_ddr_size(void)

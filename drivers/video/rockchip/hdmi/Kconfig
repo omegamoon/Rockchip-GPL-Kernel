@@ -2,11 +2,9 @@ menuconfig RK_HDMI
        bool "Rockchip HDMI support"
        select FB_MODE_HELPERS
        
-source "drivers/video/rockchip/hdmi/rk30/Kconfig"
-source "drivers/video/rockchip/hdmi/rk2928/Kconfig"
-source "drivers/video/rockchip/hdmi/sii902xa/Kconfig"
-source "drivers/video/rockchip/hdmi/it66121/Kconfig"
-source "drivers/video/rockchip/hdmi/softcec/Kconfig"
+if RK_HDMI
+source "drivers/video/rockchip/hdmi/chips/Kconfig"
+endif
 
 config RK_HDMI_DEBUG
 		bool "Rockchip HDMI Debugging"

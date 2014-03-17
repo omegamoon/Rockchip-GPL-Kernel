@@ -1,4 +1,3 @@
-/* $_FOR_ROCKCHIP_RBOX_$ */
 #include <linux/module.h>
 #include <linux/ctype.h>
 #include <linux/idr.h>
@@ -6,8 +5,7 @@
 #include <linux/kdev_t.h>
 #include <linux/display-sys.h>
 
-static struct list_head main_display_device_list;
-static struct list_head aux_display_device_list;
+static struct list_head display_device_list;
 
 static ssize_t display_show_name(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -21,13 +19,6 @@ static ssize_t display_show_type(struct device *dev,
 {
 	struct rk_display_device *dsp = dev_get_drvdata(dev);
 	return snprintf(buf, PAGE_SIZE, "%s\n", dsp->type);
-}
-
-static ssize_t display_show_property(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct rk_display_device *dsp = dev_get_drvdata(dev);
-	return snprintf(buf, PAGE_SIZE, "%d\n", dsp->property);
 }
 
 static ssize_t display_show_enable(struct device *dev,
@@ -88,13 +79,12 @@ static int mode_string(char *buf, unsigned int offset,
 	return snprintf(&buf[offset], PAGE_SIZE - offset, "%dx%d%c-%d\n",
 	                mode->xres, mode->yres, v, mode->refresh);
 }
-
 static ssize_t display_show_modes(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct rk_display_device *dsp = dev_get_drvdata(dev);
 	struct list_head *modelist, *pos;
-	struct display_modelist *display_modelist;
+	struct fb_modelist *fb_modelist;
 	const struct fb_videomode *mode;
 	int i;
 	if(dsp->ops && dsp->ops->getmodelist)
@@ -107,8 +97,8 @@ static ssize_t display_show_modes(struct device *dev,
 
 	i = 0;
 	list_for_each(pos, modelist) {
-		display_modelist = list_entry(pos, struct display_modelist, list);
-		mode = &display_modelist->mode;
+		fb_modelist = list_entry(pos, struct fb_modelist, list);
+		mode = &fb_modelist->mode;
 		i += mode_string(buf, i, mode);
 	}
 	return i;
@@ -133,7 +123,7 @@ static ssize_t display_store_mode(struct device *dev,
 	struct rk_display_device *dsp = dev_get_drvdata(dev);
 	char mstr[100];
 	struct list_head *modelist, *pos;
-	struct display_modelist *display_modelist;
+	struct fb_modelist *fb_modelist;
 	struct fb_videomode *mode;     
 	size_t i;                   
 
@@ -145,8 +135,8 @@ static ssize_t display_store_mode(struct device *dev,
 				return -EINVAL;
 		}
 		list_for_each(pos, modelist) {
-			display_modelist = list_entry(pos, struct display_modelist, list);
-			mode = &display_modelist->mode;
+			fb_modelist = list_entry(pos, struct fb_modelist, list);
+			mode = &fb_modelist->mode;
 			i = mode_string(mstr, 0, mode);
 			if (strncmp(mstr, buf, max(count, i)) == 0) {
 				if(dsp->ops && dsp->ops->setmode)
@@ -199,95 +189,14 @@ static ssize_t display_store_scale(struct device *dev,
 	return -EINVAL;
 }
 
-static ssize_t display_show_3dmode(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct rk_display_device *dsp = dev_get_drvdata(dev);
-	struct list_head *modelist, *pos;
-	struct display_modelist *display_modelist;
-	struct fb_videomode mode;
-	int i = 0, cur_3d_mode = -1;
-	
-	if(dsp->ops && dsp->ops->getmodelist)
-	{
-		if(dsp->ops->getmodelist(dsp, &modelist)) {
-			return -EINVAL;
-		}
-	}
-	else {
-		return 0;
-	}
-
-	if(dsp->ops && dsp->ops->getmode) {
-		if(dsp->ops->getmode(dsp, &mode)) {
-			return -EINVAL;
-		}
-	}
-	else {
-		return 0;
-	}
-
-	list_for_each(pos, modelist) {
-		display_modelist = list_entry(pos, struct display_modelist, list);
-		if(fb_mode_is_equal(&mode, &display_modelist->mode))
-			break;
-		else
-			display_modelist = NULL;
-	}
-	if(display_modelist)
-		i = snprintf(buf, PAGE_SIZE, "3dmodes=%d\n", display_modelist->format_3d);
-	else
-		i = snprintf(buf, PAGE_SIZE, "3dmodes=0\n");
-	
-	if(dsp->ops && dsp->ops->get3dmode)
-		cur_3d_mode = dsp->ops->get3dmode(dsp);
-	i += snprintf(buf + i, PAGE_SIZE - i, "cur3dmode=%d", cur_3d_mode);
-	return i;
-}
-
-static ssize_t display_store_3dmode(struct device *dev, 
-						struct device_attribute *attr,
-			 			const char *buf, size_t count)
-{
-	struct rk_display_device *dsp = dev_get_drvdata(dev);
-	int mode;
-	
-	if(dsp->ops && dsp->ops->set3dmode) {
-		sscanf(buf, "%d", &mode);
-		printk("input 3dmode is %d\n", mode);
-		dsp->ops->set3dmode(dsp, mode);
-		return count;
-	}
-	return -EINVAL;
-}
-
-static ssize_t display_show_sinkaudioinfo(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct rk_display_device *dsp = dev_get_drvdata(dev);
-	char audioinfo[200];
-	int ret=0;
-
-	if(dsp->ops && dsp->ops->getedidaudioinfo) {
-		ret = dsp->ops->getedidaudioinfo(dsp, audioinfo, 200);
-		if(!ret){
-			return snprintf(buf, PAGE_SIZE, "%s\n", audioinfo);
-		}
-	}
-	return -EINVAL;
-}
-
 static struct device_attribute display_attrs[] = {
 	__ATTR(name, S_IRUGO, display_show_name, NULL),
 	__ATTR(type, S_IRUGO, display_show_type, NULL),
-	__ATTR(property, S_IRUGO, display_show_property, NULL),
 	__ATTR(enable, 0664, display_show_enable, display_store_enable),
 	__ATTR(connect, S_IRUGO, display_show_connect, NULL),
 	__ATTR(modes, S_IRUGO, display_show_modes, NULL),
 	__ATTR(mode, 0664, display_show_mode, display_store_mode),
 	__ATTR(scale, 0664, display_show_scale, display_store_scale),
-	__ATTR(3dmode, 0664, display_show_3dmode, display_store_3dmode),
-	__ATTR(audioinfo, 0664, display_show_sinkaudioinfo, NULL),
 	__ATTR_NULL
 };
 
@@ -313,48 +222,15 @@ static int display_resume(struct device *dev)
 	return 0;
 };
 
-int display_add_videomode(const struct fb_videomode *mode, struct list_head *head)
-{
-	struct list_head *pos;
-	struct display_modelist *modelist;
-	struct fb_videomode *m;
-	int found = 0;
-
-	list_for_each(pos, head) {
-		modelist = list_entry(pos, struct display_modelist, list);
-		m = &modelist->mode;
-		if (fb_mode_is_equal(m, mode)) {
-			found = 1;
-			break;
-		}
-	}
-	if (!found) {
-		modelist = kmalloc(sizeof(struct display_modelist),
-						  GFP_KERNEL);
-
-		if (!modelist)
-			return -ENOMEM;
-		modelist->mode = *mode;
-		list_add(&modelist->list, head);
-	}
-	return 0;
-}
-
 void rk_display_device_enable(struct rk_display_device *ddev)
 {
-//#ifndef CONFIG_DISPLAY_AUTO_SWITCH	
-#if 0
+#ifndef CONFIG_DISPLAY_AUTO_SWITCH	
 	return;
 #else
-	struct list_head *pos, *head;
+	struct list_head *pos, *head = &display_device_list;
 	struct rk_display_device *dev = NULL, *dev_enabled = NULL, *dev_enable = NULL;
 	int enable = 0,connect, has_connect = 0;
 	
-	if(ddev->property == DISPLAY_MAIN)
-		head = &main_display_device_list;
-	else
-		head = &aux_display_device_list;
-		
 	list_for_each(pos, head) {
 		dev = list_entry(pos, struct rk_display_device, list);
 		enable = dev->ops->getenable(dev);
@@ -390,14 +266,9 @@ void rk_display_device_enable_other(struct rk_display_device *ddev)
 #ifndef CONFIG_DISPLAY_AUTO_SWITCH	
 	return;
 #else
-	struct list_head *pos, *head;
+	struct list_head *pos, *head = &display_device_list;
 	struct rk_display_device *dev;	
 	int connect = 0;
-	
-	if(ddev->property == DISPLAY_MAIN)
-		head = &main_display_device_list;
-	else
-		head = &aux_display_device_list;
 	
 	list_for_each_prev(pos, head) {
 		dev = list_entry(pos, struct rk_display_device, list);
@@ -420,14 +291,9 @@ void rk_display_device_disable_other(struct rk_display_device *ddev)
 #ifndef CONFIG_DISPLAY_AUTO_SWITCH
 	return;
 #else
-	struct list_head *pos, *head;
+	struct list_head *pos, *head = &display_device_list;
 	struct rk_display_device *dev;	
 	int enable = 0;
-	
-	if(ddev->property == DISPLAY_MAIN)
-		head = &main_display_device_list;
-	else
-		head = &aux_display_device_list;
 	
 	list_for_each(pos, head) {
 		dev = list_entry(pos, struct rk_display_device, list);
@@ -443,16 +309,11 @@ void rk_display_device_disable_other(struct rk_display_device *ddev)
 }
 EXPORT_SYMBOL(rk_display_device_disable_other);
 
-void rk_display_device_select(int property, int priority)
+void rk_display_device_select(int priority)
 {
-	struct list_head *pos, *head;
+	struct list_head *pos, *head = &display_device_list;
 	struct rk_display_device *dev;
 	int enable, found = 0;
-	
-	if(property == DISPLAY_MAIN)
-		head = &main_display_device_list;
-	else
-		head = &aux_display_device_list;
 	
 	list_for_each(pos, head) {
 		dev = list_entry(pos, struct rk_display_device, list);
@@ -508,7 +369,7 @@ struct rk_display_device *rk_display_device_register(struct rk_display_driver *d
 		if (!ret) {
 			new_dev->dev = device_create(display_class, parent,
 						     MKDEV(0, 0), new_dev,
-						     "display%d.%s", new_dev->property, new_dev->type);
+						     "%s", new_dev->type);
 			if (!IS_ERR(new_dev->dev)) {
 				new_dev->parent = parent;
 				new_dev->driver = driver;
@@ -517,14 +378,9 @@ struct rk_display_device *rk_display_device_register(struct rk_display_driver *d
 				mutex_init(&new_dev->lock);
 				// Add new device to display device list.
 				{
-					struct list_head *pos, *head;
+					struct list_head *pos, *head = &display_device_list;
 					struct rk_display_device *dev;
 					
-					if(new_dev->property == DISPLAY_MAIN)
-						head = &main_display_device_list;
-					else
-						head = &aux_display_device_list;
-						
 					list_for_each(pos, head) {
 						dev = list_entry(pos, struct rk_display_device, list);
 						if(dev->priority > new_dev->priority)
@@ -574,8 +430,7 @@ static int __init rk_display_class_init(void)
 	display_class->suspend = display_suspend;
 	display_class->resume = display_resume;
 	mutex_init(&allocated_dsp_lock);
-	INIT_LIST_HEAD(&main_display_device_list);
-	INIT_LIST_HEAD(&aux_display_device_list);
+	INIT_LIST_HEAD(&display_device_list);
 	return 0;
 }
 

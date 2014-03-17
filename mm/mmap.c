@@ -1084,6 +1084,33 @@ unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	return mmap_region(file, addr, len, flags, vm_flags, pgoff);
 }
 EXPORT_SYMBOL(do_mmap_pgoff);
+// >>> Omegamoon - Added from sunxi linux for Mali support
+unsigned long do_mmap(struct file *file, unsigned long addr,
+	unsigned long len, unsigned long prot,
+	unsigned long flag, unsigned long offset)
+{
+	if (unlikely(offset + PAGE_ALIGN(len) < offset))
+		return -EINVAL;
+	if (unlikely(offset & ~PAGE_MASK))
+		return -EINVAL;
+	return do_mmap_pgoff(file, addr, len, prot, flag, offset >> PAGE_SHIFT);
+}
+EXPORT_SYMBOL(do_mmap);
+
+unsigned long vm_mmap(struct file *file, unsigned long addr,
+	unsigned long len, unsigned long prot,
+	unsigned long flag, unsigned long offset)
+{
+	unsigned long ret;
+	struct mm_struct *mm = current->mm;
+
+	down_write(&mm->mmap_sem);
+	ret = do_mmap(file, addr, len, prot, flag, offset);
+	up_write(&mm->mmap_sem);
+	return ret;
+}
+EXPORT_SYMBOL(vm_mmap);
+// <<< Omegamoon
 
 SYSCALL_DEFINE6(mmap_pgoff, unsigned long, addr, unsigned long, len,
 		unsigned long, prot, unsigned long, flags,
@@ -1581,7 +1608,7 @@ struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 	if (mm) {
 		/* Check the cache first. */
 		/* (Cache hit rate is typically around 35%.) */
-		vma = mm->mmap_cache;
+		vma = ACCESS_ONCE(mm->mmap_cache);
 		if (!(vma && vma->vm_end > addr && vma->vm_start <= addr)) {
 			struct rb_node * rb_node;
 
@@ -2109,18 +2136,25 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 
 EXPORT_SYMBOL(do_munmap);
 
-SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
+// >>> Omegamoon - Added from sunxi linux for Mali support
+int vm_munmap(unsigned long start, size_t len)
 {
 	int ret;
 	struct mm_struct *mm = current->mm;
 
-	profile_munmap(addr);
-
 	down_write(&mm->mmap_sem);
-	ret = do_munmap(mm, addr, len);
+	ret = do_munmap(mm, start, len);
 	up_write(&mm->mmap_sem);
 	return ret;
 }
+EXPORT_SYMBOL(vm_munmap);
+
+SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
+{
+	profile_munmap(addr);
+	return vm_munmap(addr, len);
+}
+// <<< Omegamoon
 
 static inline void verify_mm_writelocked(struct mm_struct *mm)
 {

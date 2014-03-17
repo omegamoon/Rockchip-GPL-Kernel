@@ -300,8 +300,11 @@ static noinline int i2cdev_ioctl_rdrw(struct i2c_client *client,
 		return res;
 	}
 #else
-        if (copy_from_user(rdwr_pa, rdwr_arg.msgs,
-                        rdwr_arg.nmsgs * sizeof(struct i2c_msg))) {
+	if (copy_from_user(rdwr_pa, rdwr_arg.msgs,
+			   rdwr_arg.nmsgs * sizeof(struct i2c_msg))) {
+		kfree(rdwr_pa);
+		return -EFAULT;
+	}
 #endif
 	data_ptrs = kmalloc(rdwr_arg.nmsgs * sizeof(u8 __user *), GFP_KERNEL);
 	if (data_ptrs == NULL) {

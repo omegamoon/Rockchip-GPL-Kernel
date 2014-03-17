@@ -445,22 +445,19 @@ void hci_add_sco(struct hci_conn *conn, __u16 handle);
 void hci_setup_sync(struct hci_conn *conn, __u16 handle);
 void hci_sco_setup(struct hci_conn *conn, __u8 status);
 
-struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
-					__u16 pkt_type, bdaddr_t *dst);
+struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst);
 int hci_conn_del(struct hci_conn *conn);
 void hci_conn_hash_flush(struct hci_dev *hdev);
 void hci_conn_check_pending(struct hci_dev *hdev);
 
-struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
-						__u16 pkt_type, bdaddr_t *dst,
-						__u8 sec_level, __u8 auth_type);
+struct hci_conn *hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst, __u8 sec_level, __u8 auth_type);
 int hci_conn_check_link_mode(struct hci_conn *conn);
 int hci_conn_check_secure(struct hci_conn *conn, __u8 sec_level);
 int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type);
 int hci_conn_change_link_key(struct hci_conn *conn);
 int hci_conn_switch_role(struct hci_conn *conn, __u8 role);
 
-void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active);
+void hci_conn_enter_active_mode(struct hci_conn *conn);
 void hci_conn_enter_sniff_mode(struct hci_conn *conn);
 
 void hci_conn_hold_device(struct hci_conn *conn);
@@ -546,8 +543,6 @@ int hci_inquiry(void __user *arg);
 
 struct bdaddr_list *hci_blacklist_lookup(struct hci_dev *hdev, bdaddr_t *bdaddr);
 int hci_blacklist_clear(struct hci_dev *hdev);
-int hci_blacklist_add(struct hci_dev *hdev, bdaddr_t *bdaddr);
-int hci_blacklist_del(struct hci_dev *hdev, bdaddr_t *bdaddr);
 
 int hci_uuids_clear(struct hci_dev *hdev);
 
@@ -568,12 +563,6 @@ struct oob_data *hci_find_remote_oob_data(struct hci_dev *hdev,
 int hci_add_remote_oob_data(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 *hash,
 								u8 *randomizer);
 int hci_remove_remote_oob_data(struct hci_dev *hdev, bdaddr_t *bdaddr);
-
-#define ADV_CLEAR_TIMEOUT (3*60*HZ) /* Three minutes */
-int hci_adv_entries_clear(struct hci_dev *hdev);
-struct adv_entry *hci_find_adv_entry(struct hci_dev *hdev, bdaddr_t *bdaddr);
-int hci_add_adv_entry(struct hci_dev *hdev,
-					struct hci_ev_le_advertising_info *ev);
 
 void hci_del_off_timer(struct hci_dev *hdev);
 
@@ -602,7 +591,9 @@ void hci_conn_del_sysfs(struct hci_conn *conn);
 #define lmp_le_capable(dev)        ((dev)->features[4] & LMP_LE)
 
 /* ----- Extended LMP capabilities ----- */
-#define lmp_host_le_capable(dev)   ((dev)->extfeatures[0] & LMP_HOST_LE)
+// Asus BT400 support: First check if dongle is LE capable (controller) 
+#define lmp_host_le_capable(dev)   ( lmp_le_capable(dev) && \
+										(dev)->extfeatures[0] & LMP_HOST_LE)
 
 /* ----- HCI protocols ----- */
 struct hci_proto {

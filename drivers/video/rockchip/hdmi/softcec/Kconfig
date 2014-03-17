@@ -1,5 +1,0 @@
-config  RK_HDMI_GPIO_CEC
-        bool "Rockchip GPIO CEC"
-        depends on RK_HDMI
-        help
-           Use gpio to simulate CEC

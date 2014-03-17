@@ -70,7 +70,7 @@ static int _rk_get_board_id(struct board_id_private_data *id)
 		}
 		if(j >= 1000)
 		{
-			printk("%s:hareware error,gpio level changed always!\n");			
+			printk("%s:hardware error,gpio level changed always!\n",__func__);			
 			kernel_restart(NULL);
 		}
 		

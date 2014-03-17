@@ -17,6 +17,9 @@
  *  along with this program; see the file COPYING.  If not, write to
  *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+// Omegamoon >> Changed to make "dmesg --follow" work; See Fedora bug 952655
+//  https://lists.fedoraproject.org/pipermail/scm-commits/Week-of-Mon-20130506/1014794.html
+//  Files changed: fs/proc/kmsg.c; include/linux/syslog.h; kernel/printk.c
 
 #ifndef _LINUX_SYSLOG_H
 #define _LINUX_SYSLOG_H
@@ -44,8 +47,10 @@
 /* Return size of the log buffer */
 #define SYSLOG_ACTION_SIZE_BUFFER   10
 
-#define SYSLOG_FROM_CALL 0
-#define SYSLOG_FROM_FILE 1
+//#define SYSLOG_FROM_CALL 0
+//#define SYSLOG_FROM_FILE 1
+#define SYSLOG_FROM_READER           0
+#define SYSLOG_FROM_PROC             1
 
 /*
  * Syslog priority (PRI) maximum length in char : '<[0-9]{1,3}>'

@@ -902,6 +902,7 @@ static inline int tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 	if (sysctl_tcp_low_latency || !tp->ucopy.task)
 		return 0;
 
+	skb_dst_force(skb);
 	__skb_queue_tail(&tp->ucopy.prequeue, skb);
 	tp->ucopy.memory += skb->truesize;
 	if (tp->ucopy.memory > sk->sk_rcvbuf) {
@@ -1404,8 +1405,6 @@ extern struct sk_buff **tcp4_gro_receive(struct sk_buff **head,
 					 struct sk_buff *skb);
 extern int tcp_gro_complete(struct sk_buff *skb);
 extern int tcp4_gro_complete(struct sk_buff *skb);
-
-extern int tcp_nuke_addr(struct net *net, struct sockaddr *addr);
 
 #ifdef CONFIG_PROC_FS
 extern int tcp4_proc_init(void);

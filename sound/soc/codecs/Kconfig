@@ -418,6 +418,10 @@ config SND_SOC_RK1000
 	tristate
 #	depends on RK1000_CONTROL
 
+config SND_SOC_RT5616
+	tristate
+#	depends on RT5616_CONTROL
+
 config SND_SOC_RK610
 	tristate
 	depends on MFD_RK610

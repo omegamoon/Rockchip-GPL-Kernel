@@ -146,7 +146,7 @@ static int fts_i2c_write(struct fts_data *ts, const char reg, const char *buf, i
 #define    FTS_PACKET_LENGTH        128
 static u8 CTPM_FW[]=
 {
-#include "ft_app_5306.i"
+#include "ft_app_5306.h"
 };
 
 typedef enum

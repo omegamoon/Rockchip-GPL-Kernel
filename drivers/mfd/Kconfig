@@ -298,6 +298,27 @@ config TWL6030_GPADC
 	  Say yes here if you want support for the TWL6030 General Purpose
 	  A/D Convertor.
 
+config MFD_RK808
+	bool "RK808 Power Management chip"
+	depends on I2C=y 
+	select MFD_CORE
+	select RTC_RK808
+	help
+	  if you say yes here you get support for the RK808 series of
+	  Power Management chips.
+
+config MFD_RICOH619
+	bool "Ricoh RC5T619 Power Management system device"
+	depends on I2C && GPIOLIB && GENERIC_HARDIRQS
+	select MFD_CORE
+	default n
+	help
+	  If you say yes here you get support for the RICOH619 Power
+	  Management system device.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+
 config AIC3262_CODEC
 	bool "Support TI Codec Aic3262"
 	select MFD_CORE
@@ -814,6 +835,42 @@ config MFD_TPS65090
 	  This driver provides common support for accessing the device,
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
+	  
+config MFD_RT5025
+	bool "RT5025 PMIC Chip Core driver"
+	depends on I2C
+	select MFD_CORE
+	default n
+	help
+	  Enable RT5025 core driver.
+
+config MFD_RT5025_MISC
+	bool "RT5025 PMIC chip misc configuration"
+	depends on MFD_RT5025
+	default n
+	help
+	  Enable RT5025 Misc configuration.
+
+config MFD_RT5025_IRQ
+	bool "RT5025_PMIC chip irq driver"
+	depends on MFD_RT5025
+	default n
+	help
+	  Enable RT5025 IRQ configuration and interrupt.
+
+config MFD_RT5025_DEBUG
+	bool "RT5025 PMIC Chip Core Debug"
+	depends on MFD_RT5025 && DEBUG_FS
+	default n
+	help
+	  Enable RT5025 core debug driver.
+
+config MFD_RT_SHOW_INFO
+	bool "RT5025 debug message"
+	depends on MFD_RT5025
+	default n
+	help
+	  Eneable RT5025 debug message
 
 config MFD_RK610
 	bool "RK610(Jetta) Multimedia support"
@@ -831,6 +888,27 @@ config MFD_RK1000
 	  if you say yes here you get support for the RK1000, with func as
 	  TVOUT CODEC.
 	  
+config MFD_RK616
+        bool "RK616(Jetta B) Multifunction device support"
+        depends on I2C=y 
+        select MFD_CORE
+        help
+          if you say yes here you get support for the RK616, with func as
+          HDMI、LCD、LVDS、CODEC、MIPI.
+
+config RK616_USE_MCLK_12M	
+	bool "Enable 12M clock for timing reconstruction"
+	depends on MFD_RK616
+	select RK_HDMI_CTL_CODEC
+	default y
+	help
+	   if you say y here ,it will enable 12M clock for timing reconstruction
+
+config RK616_DEBUG
+	bool "RK616(JettaB) debug enable"
+	depends on MFD_RK616
+	help
+	   if you say y here ,it will enable rk616 debug function
 endif # MFD_SUPPORT
 
 menu "Multimedia Capabilities Port drivers"

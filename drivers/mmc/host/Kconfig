@@ -4,6 +4,18 @@
 
 comment "MMC/SD/SDIO Host Controller Drivers"
 
+config EMMC_RK
+	tristate "RK emmc controller suppport"
+	depends on ARCH_RK3188 || ARCH_RK3066B || ARCH_RK3026
+	default y if ARCH_RK3026
+	help
+		This selects the RK EMMC controller
+if EMMC_RK
+	config EMMC_DDR_MODE
+		default y
+		bool "RK emmc ddr mode support"
+endif
+
 config SDMMC_RK29
 	tristate "RK29 SDMMC controller suppport"
 	depends on PLAT_RK
@@ -67,7 +79,7 @@ if SDMMC_RK29
        config  RK29_SDIO_IRQ_FROM_GPIO
          bool "sdio-irq from gpio"
          default n
-         depends on SDMMC1_RK29
+         depends on SDMMC1_RK29 && (BCM_OOB_ENABLED || MT6620)
          help
             You will generate sdio interrupt from gpio if you say Yes.
             Please note that this feature requires hardware support.

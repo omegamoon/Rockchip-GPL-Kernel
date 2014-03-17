@@ -1,7 +1,6 @@
-/* $_FOR_ROCKCHIP_RBOX_$ */
 #ifndef _LINUX_DISPLAY_RK_H
 #define _LINUX_DISPLAY_RK_H
-//$_rbox_$_modify_$_zhengyang modify
+
 #include <linux/device.h>
 #include <linux/fb.h>
 #include <linux/list.h>
@@ -57,9 +56,10 @@ struct rk_display_ops {
 	int (*getmode)(struct rk_display_device *, struct fb_videomode *mode);
 	int (*setscale)(struct rk_display_device *, int, int);
 	int (*getscale)(struct rk_display_device *, int);
-	int (*get3dmode)(struct rk_display_device *);
-	int (*set3dmode)(struct rk_display_device *, int);
-	int (*getedidaudioinfo)(struct rk_display_device *, char *audioinfo, int len);
+//#ifdef OMEGAMOON_CHANGED
+	int (*setautoconfig)(struct rk_display_device *, int enable);
+	int (*getautoconfig)(struct rk_display_device *);
+//#endif
 };
 
 struct rk_display_device {
@@ -74,7 +74,9 @@ struct rk_display_device {
 	int idx;
 	struct rk_display_ops *ops;
 	int priority;
+//#ifdef OMEGAMOON_CHANGED
 	int property;
+//#endif	
 	struct list_head list;
 };
 
@@ -83,6 +85,7 @@ struct rk_display_devicelist {
 	struct rk_display_device *dev;
 };
 
+//#ifdef OMEGAMOON_CHANGED
 struct rkdisplay_platform_data {
 	int property;			//display screen property: main display or aux display.
 	int video_source;		//display screen video source
@@ -91,7 +94,8 @@ struct rkdisplay_platform_data {
 	int io_switch_pin;		//cvbs/ypbpr output switch gpio
 };
 
-extern int display_add_videomode(const struct fb_videomode *mode, struct list_head *head);
+//extern int display_add_videomode(const struct fb_videomode *mode, struct list_head *head);
+//#endif
 
 extern struct rk_display_device *rk_display_device_register(struct rk_display_driver *driver,
 					struct device *dev, void *devdata);
@@ -103,9 +107,8 @@ extern void rk_display_device_enable_other(struct rk_display_device *ddev);
 extern void rk_display_device_disable_other(struct rk_display_device *ddev);
 
 
-extern void rk_display_device_select(int property, int priority);
+extern void rk_display_device_select(int priority);
 
 #define to_rk_display_device(obj) container_of(obj, struct rk_display_device, class_dev)
 
 #endif
-//$_rbox_$_modify_$end

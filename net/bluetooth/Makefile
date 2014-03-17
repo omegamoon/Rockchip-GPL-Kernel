@@ -9,5 +9,7 @@ obj-$(CONFIG_BT_CMTP)	+= cmtp/
 obj-$(CONFIG_BT_HIDP)	+= hidp/
 
 bluetooth-y := af_bluetooth.o hci_core.o hci_conn.o hci_event.o mgmt.o hci_sock.o hci_sysfs.o lib.o
-bluetooth-$(CONFIG_BT_L2CAP)	+= l2cap_core.o l2cap_sock.o smp.o
+# Omegamoon >> Removed during merge to 3.0.101
+# smp.o
+bluetooth-$(CONFIG_BT_L2CAP)	+= l2cap_core.o l2cap_sock.o
 bluetooth-$(CONFIG_BT_SCO)	+= sco.o

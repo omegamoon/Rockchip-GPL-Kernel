@@ -52,7 +52,6 @@ struct ping_iter_state {
 };
 
 extern struct proto ping_prot;
-extern struct ping_table ping_table;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 extern struct pingv6_ops pingv6_ops;
 #endif
@@ -67,16 +66,15 @@ struct pingfakehdr {
 int  ping_get_port(struct sock *sk, unsigned short ident);
 void ping_hash(struct sock *sk);
 void ping_unhash(struct sock *sk);
-
-int  ping_init_sock(struct sock *sk);
-void ping_close(struct sock *sk, long timeout);
-int  ping_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len);
-void ping_err(struct sk_buff *skb, int offset, u32 info);
-void ping_v4_err(struct sk_buff *skb, u32 info);
+extern int  ping_init_sock(struct sock *sk);
+extern void ping_close(struct sock *sk, long timeout);
+extern int  ping_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len);
+extern void ping_rcv(struct sk_buff *);
+extern void ping_err(struct sk_buff *, u32 info);
 int  ping_getfrag(void *from, char *to, int offset, int fraglen, int odd,
 		  struct sk_buff *);
 
-int  ping_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+extern int  ping_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		  size_t len, int noblock, int flags, int *addr_len);
 int  ping_common_sendmsg(int family, struct msghdr *msg, size_t len,
 			 void *user_icmph, size_t icmph_len);
@@ -84,7 +82,7 @@ int  ping_v4_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		     size_t len);
 int  ping_v6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		     size_t len);
-int  ping_queue_rcv_skb(struct sock *sk, struct sk_buff *skb);
+extern int  ping_queue_rcv_skb(struct sock *sk, struct sk_buff *skb);
 void ping_rcv(struct sk_buff *skb);
 
 #ifdef CONFIG_PROC_FS
@@ -93,7 +91,7 @@ extern void ping_proc_exit(void);
 #endif
 
 void __init ping_init(void);
-int  __init pingv6_init(void);
+
 void pingv6_exit(void);
 
 #endif /* _PING_H */

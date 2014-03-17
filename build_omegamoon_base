@@ -6,6 +6,9 @@ DEVICE="rk3066b_defconfig"
 # Linaro gcc 4.8.2
 TOOLCHAIN=./omegamoon/toolchain/linaro/bin/arm-linux-gnueabihf-
 
+# gcc version 4.6.x-google 20120106 (prerelease)
+#TOOLCHAIN=../omegamoon/toolchain/arm-linux-androideabi-4.6/prebuilt/linux-x86/bin/arm-linux-androideabi-
+
 if [ "$1" != "" ]; then
   THREADS="$1"
 fi

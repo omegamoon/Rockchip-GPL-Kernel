@@ -360,6 +360,11 @@ static inline struct page *compound_head(struct page *page)
  * both from it and to it can be tracked, using atomic_inc_and_test
  * and atomic_add_negative(-1).
  */
+static inline void page_mapcount_reset(struct page *page)
+{
+	atomic_set(&(page)->_mapcount, -1);
+}
+
 static inline void reset_page_mapcount(struct page *page)
 {
 	atomic_set(&(page)->_mapcount, -1);
@@ -1439,6 +1444,11 @@ extern unsigned long mmap_region(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long flags,
 	vm_flags_t vm_flags, unsigned long pgoff);
 
+// >>> Omegamoon - taken from sunxi linux for Mali support
+extern unsigned long do_mmap(struct file *, unsigned long,
+        unsigned long, unsigned long,
+        unsigned long, unsigned long);
+/*
 static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long offset)
@@ -1451,10 +1461,18 @@ static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 out:
 	return ret;
 }
+*/
+// <<< Omegamoon
 
 extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
+// >>> Omegamoon - taken from sunxi linux for Mali support
+extern int vm_munmap(unsigned long, size_t);
+extern unsigned long vm_mmap(struct file *, unsigned long,
+        unsigned long, unsigned long,
+        unsigned long, unsigned long);
+// <<< Omegamoon
 
 /* filemap.c */
 extern unsigned long page_unuse(struct page *);
@@ -1544,6 +1562,8 @@ int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
 			unsigned long pfn);
 int vm_insert_mixed(struct vm_area_struct *vma, unsigned long addr,
 			unsigned long pfn);
+int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long len);
+
 
 struct page *follow_page(struct vm_area_struct *, unsigned long address,
 			unsigned int foll_flags);

@@ -1,4 +1,3 @@
-/*$_FOR_ROCKCHIP_RBOX_$*/
 /* arch/arm/mach-rk30/devices.c
  *
  * Copyright (C) 2012 ROCKCHIP, Inc.
@@ -1053,6 +1052,31 @@ static struct platform_device device_keys = {
 };
 #endif
 
+#ifdef CONFIG_EMMC_RK
+static struct resource resources_emmc[] = {
+	{
+		.start 	= IRQ_EMMC,
+		.end 	= IRQ_EMMC,
+		.flags 	= IORESOURCE_IRQ,
+	},
+	{
+		.start 	= RK30_EMMC_PHYS,
+		.end 	= RK30_EMMC_PHYS + RK30_EMMC_SIZE - 1,
+		.flags 	= IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device device_emmc = {
+	.name		= "emmc",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(resources_emmc),
+	.resource	= resources_emmc,
+	.dev 		= {
+		.platform_data = NULL,
+	},
+};
+#endif
+
 #ifdef CONFIG_SDMMC0_RK29
 static struct resource resources_sdmmc0[] = {
 	{
@@ -1105,6 +1129,9 @@ static struct platform_device device_sdmmc1 = {
 
 static void __init rk30_init_sdmmc(void)
 {
+#ifdef CONFIG_EMMC_RK
+	platform_device_register(&device_emmc);
+#endif
 #ifdef CONFIG_SDMMC0_RK29
 	platform_device_register(&device_sdmmc0);
 #endif
@@ -1113,7 +1140,6 @@ static void __init rk30_init_sdmmc(void)
 #endif
 }
 
-/*$_rbox_$_modify_$_huangzhibao_begin$_20120508_$*/
 #ifdef CONFIG_SND_RK_SOC_SPDIF
 static struct resource resources_spdif[] = {
     [0] = {
@@ -1137,12 +1163,11 @@ static struct resource resources_spdif[] = {
 };
 struct platform_device rk29_device_spdif = {
     .name             = "rk-spdif",
-    .id               = 0,
+    .id               = -1,
     .num_resources    = ARRAY_SIZE(resources_spdif),
     .resource         = resources_spdif,
 };
 #endif
-/*$_rbox_$_modify_$_huangzhibao_end$_20120508_$*/
 
 #ifdef CONFIG_RK29_VMAC
 static u64 eth_dmamask = DMA_BIT_MASK(32);
@@ -1253,11 +1278,9 @@ static int __init rk30_init_devices(void)
 #endif
 	rk30_init_i2s();
 
-/*$_rbox_$_modify_$_huangzhibao_begin$_20120508_$*/
 #ifdef CONFIG_SND_RK_SOC_SPDIF
     platform_device_register(&rk29_device_spdif);
 #endif
-/*$_rbox_$_modify_$_huangzhibao_end$_20120508_$*/
 #ifdef CONFIG_RK29_VMAC
 	platform_device_register(&device_vmac);
 #endif

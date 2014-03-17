@@ -180,24 +180,82 @@ static int hci_sock_release(struct socket *sock)
 	return 0;
 }
 
-static int hci_sock_blacklist_add(struct hci_dev *hdev, void __user *arg)
+struct bdaddr_list *hci_blacklist_lookup(struct hci_dev *hdev, bdaddr_t *bdaddr)
 {
-	bdaddr_t bdaddr;
+	struct list_head *p;
 
-	if (copy_from_user(&bdaddr, arg, sizeof(bdaddr)))
-		return -EFAULT;
+	list_for_each(p, &hdev->blacklist) {
+		struct bdaddr_list *b;
 
-	return hci_blacklist_add(hdev, &bdaddr);
+		b = list_entry(p, struct bdaddr_list, list);
+
+		if (bacmp(bdaddr, &b->bdaddr) == 0)
+			return b;
+	}
+
+	return NULL;
 }
 
-static int hci_sock_blacklist_del(struct hci_dev *hdev, void __user *arg)
+static int hci_blacklist_add(struct hci_dev *hdev, void __user *arg)
 {
 	bdaddr_t bdaddr;
+	struct bdaddr_list *entry;
 
 	if (copy_from_user(&bdaddr, arg, sizeof(bdaddr)))
 		return -EFAULT;
 
-	return hci_blacklist_del(hdev, &bdaddr);
+	if (bacmp(&bdaddr, BDADDR_ANY) == 0)
+		return -EBADF;
+
+	if (hci_blacklist_lookup(hdev, &bdaddr))
+		return -EEXIST;
+
+	entry = kzalloc(sizeof(struct bdaddr_list), GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+
+	bacpy(&entry->bdaddr, &bdaddr);
+
+	list_add(&entry->list, &hdev->blacklist);
+
+	return 0;
+}
+
+int hci_blacklist_clear(struct hci_dev *hdev)
+{
+	struct list_head *p, *n;
+
+	list_for_each_safe(p, n, &hdev->blacklist) {
+		struct bdaddr_list *b;
+
+		b = list_entry(p, struct bdaddr_list, list);
+
+		list_del(p);
+		kfree(b);
+	}
+
+	return 0;
+}
+
+static int hci_blacklist_del(struct hci_dev *hdev, void __user *arg)
+{
+	bdaddr_t bdaddr;
+	struct bdaddr_list *entry;
+
+	if (copy_from_user(&bdaddr, arg, sizeof(bdaddr)))
+		return -EFAULT;
+
+	if (bacmp(&bdaddr, BDADDR_ANY) == 0)
+		return hci_blacklist_clear(hdev);
+
+	entry = hci_blacklist_lookup(hdev, &bdaddr);
+	if (!entry)
+		return -ENOENT;
+
+	list_del(&entry->list);
+	kfree(entry);
+
+	return 0;
 }
 
 /* Ioctls that require bound socket */
@@ -232,12 +290,12 @@ static inline int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd, unsign
 	case HCIBLOCKADDR:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-		return hci_sock_blacklist_add(hdev, (void __user *) arg);
+		return hci_blacklist_add(hdev, (void __user *) arg);
 
 	case HCIUNBLOCKADDR:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-		return hci_sock_blacklist_del(hdev, (void __user *) arg);
+		return hci_blacklist_del(hdev, (void __user *) arg);
 
 	default:
 		if (hdev->ioctl)
@@ -459,6 +517,10 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	struct hci_dev *hdev;
 	struct sk_buff *skb;
 	int err;
+	// Omegamoon >> Fixes alignment error
+	//  See: http://www.freaktab.com/showthread.php?7679-usb-device-fails-to-initiate-DWC_OTG-error&p=112477&viewfull=1#post112477
+	__u8 *s_ptr, *d_ptr;
+	int i;
 
 	BT_DBG("sock %p sk %p", sock, sk);
 
@@ -505,7 +567,16 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	}
 
 	bt_cb(skb)->pkt_type = *((unsigned char *) skb->data);
-	skb_pull(skb, 1);
+
+	// Omegamoon >> Asus BT400 support; This fixes alignment error
+	//  See: http://www.freaktab.com/showthread.php?7679-usb-device-fails-to-initiate-DWC_OTG-error&p=112477&viewfull=1#post112477
+	//skb_pull(skb, 1);
+	s_ptr = (__u8 *)skb->data + 1;
+	d_ptr = (__u8 *)skb->data;
+	for( i=0; i<(skb->len - 1); i++ )
+		*d_ptr++ = *s_ptr++;
+	skb->len -= 1;
+
 	skb->dev = (void *) hdev;
 
 	if (bt_cb(skb)->pkt_type == HCI_COMMAND_PKT) {

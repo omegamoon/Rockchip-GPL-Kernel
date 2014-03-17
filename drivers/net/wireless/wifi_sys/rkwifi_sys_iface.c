@@ -1,6 +1,4 @@
 
-
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -50,43 +48,83 @@ static ssize_t wifi_chip_read(struct class *cls, char *_buf)
 #endif
 
 #ifdef CONFIG_RK901
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK901");
+    printk("Current WiFi chip is RK901(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK901");
     printk("Current WiFi chip is RK901.\n");
 #endif
+#endif
 
 #ifdef CONFIG_RK903
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK903");
+    printk("Current WiFi chip is RK903(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK903");
     printk("Current WiFi chip is RK903.\n");
 #endif
+#endif
 
 #ifdef CONFIG_AP6181
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK901");
+    printk("Current WiFi chip is AP6181(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK901");
     printk("Current WiFi chip is AP6181.\n");
 #endif
+#endif
 
 #ifdef CONFIG_AP6210
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK901");
+    printk("Current WiFi chip is AP6210(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK901");
     printk("Current WiFi chip is AP6210.\n");
 #endif
+#endif
 
 #ifdef CONFIG_AP6330
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK903");
+    printk("Current WiFi chip is AP6330(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK903");
     printk("Current WiFi chip is AP6330.\n");
 #endif
+#endif
 
 #ifdef CONFIG_AP6476
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK901");
+    printk("Current WiFi chip is AP6476(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK901");
     printk("Current WiFi chip is AP6476.\n");
 #endif
+#endif
 
 #ifdef CONFIG_AP6493
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK903");
+    printk("Current WiFi chip is AP6493(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK903");
     printk("Current WiFi chip is AP6493.\n");
 #endif
+#endif
 
 #ifdef CONFIG_GB86302I
+#ifdef CONFIG_BCM_OOB_ENABLED
+    count = sprintf(_buf, "%s", "OOB_RK903");
+    printk("Current WiFi chip is GB86302I(OOB)\n");
+#else
     count = sprintf(_buf, "%s", "RK903");
     printk("Current WiFi chip is GB86302I.\n");
+#endif
 #endif
 
 #ifdef CONFIG_MTK_COMBO
@@ -109,6 +147,11 @@ static ssize_t wifi_chip_read(struct class *cls, char *_buf)
     printk("Current WiFi chip is MT5931.\n");
 #endif
 
+#ifdef CONFIG_MTK_MT5931
+    count = sprintf(_buf, "%s", "MT5931");
+    printk("Current WiFi chip is MT5931.\n");
+#endif
+
 #ifdef CONFIG_MT7601
     count = sprintf(_buf, "%s", "MT7601");
     printk("Current WiFi chip is MT7601.\n");
@@ -118,6 +161,11 @@ static ssize_t wifi_chip_read(struct class *cls, char *_buf)
 #ifdef CONFIG_RTL8723AS
     count = sprintf(_buf, "%s", "RTL8723AS");
     printk("Current WiFi chip is RTL8723AS.\n");
+#endif
+
+#ifdef CONFIG_ESP8089
+    count = sprintf(_buf, "%s", "ESP8089");
+    printk("Current WiFi chip is ESP8089.\n");
 #endif
 
     return count;
@@ -159,6 +207,11 @@ static ssize_t wifi_p2p_read(struct class *cls, char *_buf)
 {
 	int count = 0;
 
+#ifdef CONFIG_BK3515A_COMBO
+	count = sprintf(_buf, "%s", "BK3515A");
+	printk("Current WiFi chip is ESP8089+BK3515A Combo.\n");
+#endif
+
 #ifdef CONFIG_BCM4329
     count = sprintf(_buf, "%s", "false");
 	printk("Current WiFi chip BCM4329 doesn't support direct.(%s)\n", _buf);
@@ -197,7 +250,7 @@ static ssize_t wifi_pcba_read(struct class *cls, char *_buf)
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37))
-static ssize_t wifi_pcba_write(struct class *cls, struct class_attribute *attr, char *_buf, size_t _count)
+static ssize_t wifi_pcba_write(struct class *cls, struct class_attribute *attr, const char *_buf, size_t _count)
 #else
 static ssize_t wifi_pcba_write(struct class *cls, char *_buf, size_t _count)
 #endif 

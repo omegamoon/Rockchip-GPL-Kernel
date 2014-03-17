@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/platform_device.h>
 #include <asm/uaccess.h>
+#include <asm/io.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include "eth_mac.h"
@@ -29,7 +30,16 @@
 
 #define WLAN_MAC_FILE "/data/misc/wifi/wlan_mac"
 
-extern char GetSNSectorInfo(char * pbuf);
+//extern char GetSNSectorInfo(char * pbuf);
+
+static char GetSNSectorInfoBeforeNandInit(char * pbuf)
+{
+    char * sn_addr = ioremap(0x10501600,0x200);
+    memcpy(pbuf,sn_addr,0x200);
+    iounmap(sn_addr);
+	//print_hex_dump(KERN_WARNING, "sn:", DUMP_PREFIX_NONE, 16,1, sn_addr, 16, 0);
+    return 0;
+}
 
 int eth_mac_read_from_IDB(u8 *mac)
 {
@@ -39,7 +49,11 @@ int eth_mac_read_from_IDB(u8 *mac)
     if(mac == NULL)
         return -EFAULT;
 
-    GetSNSectorInfo(tempBuf);
+    GetSNSectorInfoBeforeNandInit(tempBuf);
+    /*for (i = 0; i < 512; i++) {
+        printk("%02x, ", tempBuf[i]);
+		if(((i+1)%16) == 0) printk("\n");
+	}*/
 
     for (i = 506; i <= 511; i++)
 		mac[i-506] = tempBuf[i];
@@ -69,7 +83,7 @@ int eth_mac_idb(u8 *eth_mac)
 *大写转小写
 *
 */
-void   to_lower(char   *str) 
+static void   to_lower(char   *str) 
 { 
 	int   i=0; 
 	while(str[i]!=0) 
@@ -86,7 +100,7 @@ void   to_lower(char   *str)
   *
   *
   */
-void  trans( char *src ,int * k) 
+static void  trans( char *src ,int * k) 
 {
     char c;
     int i;

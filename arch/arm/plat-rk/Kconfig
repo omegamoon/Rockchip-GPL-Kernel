@@ -82,6 +82,10 @@ config DDR_TYPE_DDR3_DEFAULT
 
 endchoice
 
+config EMMC_IO_3_3V
+	bool "Emmc io domain voltage select 3.3v"
+	depends on ARCH_RK3066B || ARCH_RK3188
+
 config DDR_INIT_CHANGE_FREQ
 	bool "Enable change DDR frequence when ddr_init"
 	default y if ARCH_RK2928 || ARCH_RK30XX
@@ -118,6 +122,7 @@ config RK_CLOCK_PROC
 	bool "/proc/clocks support"
 	depends on PROC_FS
 
+source arch/arm/plat-rk/bid/Kconfig
 
 if !ARCH_RK29
 menu "Support for RK power manage"
@@ -152,7 +157,7 @@ endchoice
 
 config RK29_VPU
 	tristate "VPU (Video Processing Unit) service driver in kernel"
-	depends on ARCH_RK29 || ARCH_RK30 || ARCH_RK2928
+	depends on ARCH_RK29 || ARCH_RK30 || ARCH_RK2928 || ARCH_RK3026 || ARCH_RK3188
 	default m
 
 config RK29_LAST_LOG
@@ -173,13 +178,13 @@ config RK_EARLY_PRINTK
 config RK_DEBUG_UART
 	int "Debug UART"
 	default 1 if ARCH_RK29
-	default 2 if ARCH_RK30 || ARCH_RK2928 || ARCH_RK3188
+	default 2 if ARCH_RK30 || ARCH_RK2928 || ARCH_RK3188 || ARCH_RK3026
 	help
 	  Select a UART for debugging. -1 disable.
 
 config RK_USB_UART
 	bool "Support USB UART Bypass Function"
-	depends on (ARCH_RK2928 || ARCH_RK3188) && (RK_DEBUG_UART = 2)
+	depends on (ARCH_RK2928 || ARCH_RK3188 || ARCH_RK3026) && (RK_DEBUG_UART = 2)
 
 config RK_CONSOLE_THREAD
 	bool "Console write by thread"
@@ -207,13 +212,21 @@ config RK_FPGA
 
 config RK_CONFIG
 	bool
+	
+config MACH_RK_FAC
+	bool
 
 config RK_TIMER
 	bool
 
 config RK_USB_DETECT_BY_OTG_BVALID
 	bool "Wakeup system by OTG BVALID interrupt when USB OTG conneted"
-	depends on USB_GADGET && (ARCH_RK2928 || ARCH_RK3188)
-	default y if ARCH_RK2928 || ARCH_RK3188
+	depends on USB_GADGET && (ARCH_RK2928 || ARCH_RK3188 || ARCH_RK3026)
+	default y
 
+config RK_CHECK_UACCESS
+	bool "Enable explicitly check __user pointer when {get,put}_user"
+
+config TRACK_LOCALHOST
+	bool "Enable xt_qtaguid track traffic stat for loopback"
 endif

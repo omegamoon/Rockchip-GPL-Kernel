@@ -93,6 +93,18 @@ config USB_RTL8150
 	  To compile this driver as a module, choose M here: the
 	  module will be called rtl8150.
 
+config USB_RTL8152
+	tristate "USB RTL8152 based ethernet device support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	select MII
+	help
+	  Say Y here if you have RTL8152 based usb-ethernet adapter.
+	  Send me <petkan@users.sourceforge.net> any comments you may have.
+	  You can also check for updates at <http://pegasus2.sourceforge.net/>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rtl8152.
+
 config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
 	select MII

@@ -32,7 +32,11 @@ int rk29sdk_bt_power_state = 0;
 	    #define USE_SDMMC_CONTROLLER_FOR_WIFI   0
    		#define COMBO_MODULE_MT6620_CDT         0  //- 1--use Cdtech chip; 0--unuse CDT chip
         //power
+#if defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
+        #define RK30SDK_WIFI_GPIO_POWER_N                   RK30_PIN3_PA0//RK30_PIN3_PD0     modify by nition       
+#else
         #define RK30SDK_WIFI_GPIO_POWER_N                   RK30_PIN3_PD0            
+#endif
         #define RK30SDK_WIFI_GPIO_POWER_ENABLE_VALUE        GPIO_HIGH        
         #define RK30SDK_WIFI_GPIO_POWER_PIN_NAME            GPIO3D0_SDMMC1PWREN_NAME
         #define RK30SDK_WIFI_GPIO_POWER_IOMUX_FGPIO         GPIO3D_GPIO3D0
@@ -339,8 +343,11 @@ static int rk29sdk_wifi_status_register(void (*callback)(int card_present, void 
 static int __init rk29sdk_wifi_bt_gpio_control_init(void)
 {
     rk29sdk_init_wifi_mem();    
+#if defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
+	iomux_set(GPIO3_D0);//add by nition
+#else
     rk29_mux_api_set(rk_platform_wifi_gpio.power_n.iomux.name, rk_platform_wifi_gpio.power_n.iomux.fgpio);
-
+#endif
     if (rk_platform_wifi_gpio.power_n.io != INVALID_GPIO) {
         if (gpio_request(rk_platform_wifi_gpio.power_n.io, "wifi_power")) {
                pr_info("%s: request wifi power gpio failed\n", __func__);
@@ -396,22 +403,32 @@ static int __init rk29sdk_wifi_bt_gpio_control_init(void)
 }
 
 #if (defined(CONFIG_RTL8192CU) || defined(CONFIG_RTL8188EU) || defined(CONFIG_RTL8723AU)) \
-	&& defined(CONFIG_ARCH_RK2928)
+	&& (defined(CONFIG_ARCH_RK2928) || defined(CONFIG_MACH_RK3026_86V) ||defined(CONFIG_MACH_RK3026_86V_FAC))
 static int usbwifi_power_status = 1;
 int rk29sdk_wifi_power(int on)
 {
         pr_info("%s: %d\n", __func__, on);
          if (on){
+            #if defined(CONFIG_USB_WIFI_POWER_CONTROLED_BY_GPIO)
+                gpio_set_value(rk_platform_wifi_gpio.power_n.io, rk_platform_wifi_gpio.power_n.enable);
+                mdelay(100);
+            #else
                 if(usbwifi_power_status == 1) {
                     rkusb_wifi_power(0);
                     mdelay(50);
                 }
                 rkusb_wifi_power(1);
+            #endif
                 usbwifi_power_status = 1;
                  pr_info("wifi turn on power\n");  	
         }else{
+            #if defined(CONFIG_USB_WIFI_POWER_CONTROLED_BY_GPIO)
+                gpio_set_value(rk_platform_wifi_gpio.power_n.io, !(rk_platform_wifi_gpio.power_n.enable));
+                mdelay(100);
+            #else
                 rkusb_wifi_power(0);
                 usbwifi_power_status = 0;    	
+            #endif
                  pr_info("wifi shut off power\n");
         }
         return 0;
@@ -422,6 +439,9 @@ int rk29sdk_wifi_power(int on)
         pr_info("%s: %d\n", __func__, on);
         if (on){
                 gpio_set_value(rk_platform_wifi_gpio.power_n.io, rk_platform_wifi_gpio.power_n.enable);
+#if defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
+				gpio_pull_updown(RK30_PIN3_PD0, 1);//add by nition
+#endif
                 mdelay(50);
 
                 #if defined(CONFIG_SDMMC1_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)	
@@ -437,6 +457,9 @@ int rk29sdk_wifi_power(int on)
         }else{
 //                if (!rk29sdk_bt_power_state){
                         gpio_set_value(rk_platform_wifi_gpio.power_n.io, !(rk_platform_wifi_gpio.power_n.enable));
+#if defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
+						gpio_pull_updown(RK30_PIN3_PD0, 0);//add by nition
+#endif
 
                         #if defined(CONFIG_SDMMC1_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)	
                         rk29_sdmmc_gpio_open(1, 0); //added by xbw at 2011-10-13
@@ -482,12 +505,19 @@ int rk29sdk_wifi_set_carddetect(int val)
 }
 EXPORT_SYMBOL(rk29sdk_wifi_set_carddetect);
 
+#if !defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
 #define WIFI_HOST_WAKE RK30_PIN3_PD2
+#endif
 
 static struct resource resources[] = {
 	{
+#if defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
+		.start = RK30SDK_WIFI_GPIO_WIFI_INT_B,
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+#else
 		.start = WIFI_HOST_WAKE,
 		.flags = IORESOURCE_IRQ,
+#endif
 		.name = "bcmdhd_wlan_irq",
 	},
 };

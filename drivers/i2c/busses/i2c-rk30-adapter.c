@@ -117,6 +117,10 @@ static int rk30_i2c_check_idle(struct rk30_i2c *i2c)
 	sda_io = iomux_mode_to_gpio(i2c->sda_mode);
 	scl_io = iomux_mode_to_gpio(i2c->scl_mode);
 
+#if defined(CONFIG_MINIX_NEOX7_WORKAROUNDS)
+	if(218==sda_io||219==sda_io)
+		return I2C_IDLE;
+#endif
 	ret = gpio_request(sda_io, NULL);
 	if(unlikely(ret < 0)){
 		dev_err(i2c->dev, "Failed to request gpio: SDA_GPIO\n");

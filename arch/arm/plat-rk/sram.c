@@ -27,7 +27,7 @@ extern char __sram_data_start, __ssram_data, __esram_data;
 #define SRAM_CACHED	RK30_IMEM_BASE
 #define SRAM_PHYS	RK30_IMEM_PHYS
 #define SRAM_SIZE	RK30_IMEM_SIZE
-#elif defined(CONFIG_ARCH_RK2928)
+#elif defined(CONFIG_ARCH_RK2928) || defined(CONFIG_ARCH_RK3026)
 #define SRAM_NONCACHED	RK2928_IMEM_NONCACHED
 #define SRAM_CACHED	RK2928_IMEM_BASE
 #define SRAM_PHYS	RK2928_IMEM_PHYS
@@ -179,7 +179,7 @@ void __sramfunc sram_printhex(unsigned int hex)
 }
 
 struct sram_gpio_data __sramdata pmic_sleep,pmic_vsel;
-#if defined(CONFIG_ARCH_RK2928)
+#if defined(CONFIG_ARCH_RK2928) || defined(CONFIG_ARCH_RK3026)
 static void __iomem *gpio_base[] = {RK2928_GPIO0_BASE, RK2928_GPIO1_BASE, RK2928_GPIO2_BASE, RK2928_GPIO3_BASE};
 #elif defined(CONFIG_ARCH_RK3066B) || defined(CONFIG_ARCH_RK3188)
 static void __iomem *gpio_base[] = {RK30_GPIO0_BASE, RK30_GPIO1_BASE, RK30_GPIO2_BASE, RK30_GPIO3_BASE};
@@ -195,23 +195,10 @@ int sram_gpio_init(int gpio, struct sram_gpio_data *data)
        if(gpio == INVALID_GPIO)
                return -EINVAL;
        index = gpio - PIN_BASE;
+       if(index/NUM_GROUP >= ARRAY_SIZE(gpio_base))
+               return -EINVAL;
 
-       #if !defined(CONFIG_ARCH_RK30)
-         if(index/NUM_GROUP >= ARRAY_SIZE(gpio_base))
-           return -EINVAL;
-      
-         data->base = gpio_base[index/NUM_GROUP];
-       #else
-          //Galland: RK30_GPIO5_BASE is missing from gpio_base array, 
-		  //  so this fails on any pin on RK30_PIN6_* (like PMU_POWER_SLEEP)
-          if(index/NUM_GROUP > ARRAY_SIZE(gpio_base) && index/NUM_GROUP != 5) 
-            return -EINVAL;
-         
-		  //Galland: RK30_GPIO6_BASE takes the place of GPIO5 in the gpio_base array 
-		  //  (but index/NUM_GROUP=6, so adjust to point to index 5)
-          data->base = gpio_base[((index/NUM_GROUP)==6?5:(index/NUM_GROUP))]; 
-       #endif
-
+       data->base = gpio_base[index/NUM_GROUP];
        if(data->base == 0)
 	       return -EINVAL;
 

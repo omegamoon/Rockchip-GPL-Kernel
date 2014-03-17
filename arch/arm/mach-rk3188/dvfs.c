@@ -92,10 +92,13 @@ static struct lkg_maxvolt lkg_volt_table[] = {
 #else
 /* avdd_com & vdd_arm short circuit */
 static struct lkg_maxvolt lkg_volt_table[] = {
-	{.leakage_level = 3,	.maxvolt = 1350 * 1000},
-	{.leakage_level = 15,	.maxvolt = 1250 * 1000},
+	{.leakage_level = 9000,		.maxvolt = 1350 * 1000},
+	{.leakage_level = 15000,	.maxvolt = 1300 * 1000},
+	{.leakage_level = 55000,	.maxvolt = 1250 * 1000},
 };
 #endif
+#define LOW_LEAKAGE_BOUND	2
+#define VOLT_COMPENSATION	(25000)	// uV
 static int leakage_level = 0;
 #define MHZ	(1000 * 1000)
 #define KHZ	(1000)
@@ -124,6 +127,7 @@ void dvfs_adjust_table_lmtvolt(struct clk *clk, struct cpufreq_frequency_table *
 		 * about Freq nandc/Volt log.
 		 *
 		 */
+		return;
 
 		unsigned long delayline_val = 0;
 		unsigned long high_delayline = 0, low_delayline = 0;
@@ -154,6 +158,7 @@ void dvfs_adjust_table_lmtvolt(struct clk *clk, struct cpufreq_frequency_table *
 		}
 	}
 
+	// limit high voltage
 	for (i = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
 		if (table[i].index > maxvolt) {
 			printk("\t\tadjust table freq=%d KHz, index=%d mV", table[i].frequency, table[i].index);
@@ -161,6 +166,26 @@ void dvfs_adjust_table_lmtvolt(struct clk *clk, struct cpufreq_frequency_table *
 			printk(" to index=%d mV\n", table[i].index);
 		}
 	}
+#if 0
+	/*
+	 * Low freq add some voltage for low leakage chip.
+	 * Open it when necessary.
+	 *
+	 */
+
+	// limit low voltage
+	if (strncmp(clk->dvfs_info->name, "cpu", strlen("cpu")) == 0
+			&& leakage_level <= LOW_LEAKAGE_BOUND) {
+		for (i = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
+			if (table[i].index + VOLT_COMPENSATION < maxvolt) {
+				printk("\t\tadjust table freq=%d KHz, index=%d mV",
+						table[i].frequency, table[i].index);
+				table[i].index += VOLT_COMPENSATION;
+				printk(" to index=%d mV\n", table[i].index);
+			}
+		}
+	}
+#endif
 }
 
 #define NO_VOLT_DIFF

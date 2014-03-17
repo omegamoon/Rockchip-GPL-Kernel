@@ -34,16 +34,13 @@ config NO_DUAL_DISP
 	depends on FB_ROCKCHIP
 	help
 	  No dual display needed
+config ONE_LCDC_ONE_DISP_FOR_HDMI
+	bool "one lcdc only one output display for hdmi support"
+	depends on FB_ROCKCHIP
+	help
+	  select y if use one lcdc for only hdmi output as primary display	
 endchoice
 
-config LCDC_OVERLAY_ENABLE
-	bool "Use Overlay mode to display video"
-	depends on FB_ROCKCHIP
-	select NO_DUAL_DISP
-	select BOX_FB_1080P
-	help
-		Enable overlay mode: win1 is used for display ui and win0 is used for display video.
-		
 config FB_ROTATE
 	bool"FB rotate support"
 	depends on FB_ROCKCHIP
@@ -66,7 +63,11 @@ config THREE_FB_BUFFER
 
 
 source "drivers/video/rockchip/lcdc/Kconfig"
+source "drivers/video/rockchip/screen/Kconfig"
+source "drivers/video/rockchip/transmitter/Kconfig"
 source "drivers/video/rockchip/hdmi/Kconfig"
 source "drivers/video/rockchip/rga/Kconfig"
-source "drivers/video/rockchip/lvds/Kconfig"
+
+# >>> Omegamoon - tve is 'old' location of tvencoder driver(s)
+# source "drivers/video/rockchip/tve/Kconfig"
 source "drivers/video/rockchip/tvencoder/Kconfig"

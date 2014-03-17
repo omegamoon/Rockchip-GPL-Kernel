@@ -1,4 +1,3 @@
-//$_FOR_ROCKCHIP_RBOX_$
 /*
  * linux/drivers/video/rockchip/rkfb-sysfs.c
  *
@@ -327,71 +326,6 @@ static ssize_t set_dsp_lut(struct device *dev,struct device_attribute *attr,
 	
 }
 
-//$_rbox_$_modify_$_zhengyang modified for box display system
-static ssize_t show_scale(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct rk_lcdc_device_driver * dev_drv = 
-		(struct rk_lcdc_device_driver * )fbi->par;
-	return snprintf(buf, PAGE_SIZE, "xscale=%d yscale=%d\n", dev_drv->x_scale, dev_drv->y_scale);
-}
-
-static ssize_t set_scale(struct device *dev,struct device_attribute *attr,
-	const char *buf, size_t count)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct rk_lcdc_device_driver * dev_drv = (struct rk_lcdc_device_driver * )fbi->par;
-	struct fb_var_screeninfo *var = NULL;
-	u16 xpos, ypos, xsize, ysize;
-	u32 scale;
-	
-	if(!strncmp(buf, "xscale", 6)) {
-		sscanf(buf, "xscale=%d", &scale);
-		if(scale >= 0 && scale <= 100)
-			dev_drv->x_scale = scale;
-	}
-	else if(!strncmp(buf, "yscale", 6)) {
-		sscanf(buf, "yscale=%d", &scale);
-		if(scale >= 0 && scale <= 100)
-			dev_drv->y_scale = scale;
-	}
-	else {
-		sscanf(buf, "%d", &scale);
-		if(scale >= 0 && scale <= 100) {
-			dev_drv->x_scale = scale;
-			dev_drv->y_scale = scale;
-		}
-	}
-//	printk("scale rate x %d y %d\n", dev_drv->x_scale, dev_drv->y_scale);
-#if 0	
-	var = &fbi->var;
-	xpos = (dev_drv->cur_screen->x_res - dev_drv->cur_screen->x_res*dev_drv->x_scale/100)>>1;
-	ypos = (dev_drv->cur_screen->y_res - dev_drv->cur_screen->y_res*dev_drv->y_scale/100)>>1;
-	xsize = dev_drv->cur_screen->x_res * dev_drv->x_scale/100;
-	ysize = dev_drv->cur_screen->y_res * dev_drv->y_scale/100;
-//	printk("var->nonstd is %02x\n", var->nonstd);
-	var->nonstd &= 0xff;
-	var->nonstd |= (xpos << 8) + (ypos << 20);
-//	printk("var->nonstd is %02x\n", var->nonstd);
-	var->grayscale &= 0xff;
-	var->grayscale |= (xsize << 8) + (ysize << 20);
-
-	fbi->fbops->fb_set_par(fbi);
-#endif
-	return count;
-}
-
-static ssize_t show_lcdc_id(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct rk_lcdc_device_driver * dev_drv = 
-		(struct rk_lcdc_device_driver * )fbi->par;
-	return snprintf(buf, PAGE_SIZE, "%d\n", dev_drv->id);
-}
-//$_rbox_$_modify_$end
-
 static struct device_attribute rkfb_attrs[] = {
 	__ATTR(phys_addr, S_IRUGO, show_phys, NULL),
 	__ATTR(virt_addr, S_IRUGO, show_virt, NULL),
@@ -403,10 +337,6 @@ static struct device_attribute rkfb_attrs[] = {
 	__ATTR(fps, S_IRUGO | S_IWUSR, show_fps, set_fps),
 	__ATTR(map, S_IRUGO | S_IWUSR, show_fb_win_map, set_fb_win_map),
 	__ATTR(dsp_lut, S_IRUGO | S_IWUSR, show_dsp_lut, set_dsp_lut),
-	//$_rbox_$_modify_$_zhengyang modified for box display system
-	__ATTR(scale, S_IRUGO | S_IWUSR, show_scale, set_scale),
-	__ATTR(lcdcid, S_IRUGO | S_IWUSR, show_lcdc_id, NULL),
-	//$_rbox_$_modify_$end
 };
 
 int rkfb_create_sysfs(struct fb_info *fbi)

@@ -1,5 +1,3 @@
-//$_FOR_ROCKCHIP_RBOX_$
-
 /* ==========================================================================
  * $File: //dwh/usb_iip/dev/software/otg_ipmate/linux/drivers/dwc_otg_cil_intr.c $
  * $Revision: #7 $
@@ -50,14 +48,10 @@
 #include "dwc_otg_pcd.h"
 #include "dwc_otg_hcd.h"
 #include <linux/suspend.h>
-
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP
 extern void rk28_send_wakeup_key(void);
 extern suspend_state_t get_suspend_state(void);
 #endif
-//$_rbox_$_modify_$_end	
 
 #if 1//#ifdef DEBUG
 inline const char *op_state_str( dwc_otg_core_if_t *_core_if ) 
@@ -724,61 +718,43 @@ int32_t dwc_otg_handle_common_intr( dwc_otg_core_if_t *_core_if )
 {
 	int retval = 0;
         gintsts_data_t gintsts;
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP        
     int rk29_usb_wakeup = 0;
 #endif 
-//$_rbox_$_modify_$_end	
         gintsts.d32 = dwc_otg_read_common_intr(_core_if);
 
         if (gintsts.b.modemismatch) {
                 retval |= dwc_otg_handle_mode_mismatch_intr( _core_if );
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP                 
                 rk29_usb_wakeup = 1;  
 #endif 
-//$_rbox_$_modify_$_end	
         }
         if (gintsts.b.otgintr) {
                 retval |= dwc_otg_handle_otg_intr( _core_if );
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP                 
                 rk29_usb_wakeup = 1; 
 #endif 
-//$_rbox_$_modify_$_end	
         }
         if (gintsts.b.conidstschng) {
                 retval |= dwc_otg_handle_conn_id_status_change_intr( _core_if );
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP                 
                 rk29_usb_wakeup = 1;  
 #endif 
-//$_rbox_$_modify_$_end	
         }
         if (gintsts.b.disconnect) {
                 retval |= dwc_otg_handle_disconnect_intr( _core_if );
         }
         if (gintsts.b.sessreqintr) {
                 retval |= dwc_otg_handle_session_req_intr( _core_if );
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP                 
                 rk29_usb_wakeup = 1;
 #endif 
-//$_rbox_$_modify_$_end	
         }
         if (gintsts.b.wkupintr) {
                 retval |= dwc_otg_handle_wakeup_detected_intr( _core_if );
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin
 #ifdef CONFIG_DWC_REMOTE_WAKEUP                 
                 rk29_usb_wakeup = 1;
 #endif 
-//$_rbox_$_modify_$_end	
         }
         if (gintsts.b.usbsuspend) {
                 retval |= dwc_otg_handle_usb_suspend_intr( _core_if );
@@ -792,22 +768,17 @@ int32_t dwc_otg_handle_common_intr( dwc_otg_core_if_t *_core_if )
                 dwc_write_reg32(&_core_if->core_global_regs->gintsts, 
                                 gintsts.d32);
                 retval |= 1;
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin                
+                
 #ifdef CONFIG_DWC_REMOTE_WAKEUP                
                 rk29_usb_wakeup = 1; 
 #endif
-//$_rbox_$_modify_$_end	
         }
-//$_rbox_$_modify_$_huangzhibao_20121026 for usb remote wakeup
-//$_rbox_$_modify_$_begin        
 #ifdef CONFIG_DWC_REMOTE_WAKEUP        
         if (rk29_usb_wakeup && get_suspend_state()){
             rk28_send_wakeup_key();
             rk29_usb_wakeup = 0;
         }
 #endif 
-//$_rbox_$_modify_$_end	       
         return retval;
 }
 

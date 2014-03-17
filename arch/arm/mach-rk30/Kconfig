@@ -1,4 +1,3 @@
-#$_FOR_ROCKCHIP_RBOX_$
 config ARCH_RK30XX
 	depends on ARCH_RK30
 	bool
@@ -15,6 +14,10 @@ choice
 config SOC_RK3000
 	bool "RK3000"
 	select ARCH_RK30XX
+
+config SOC_RK3028
+	bool "RK3028"
+	select ARCH_RK3066B
 
 config SOC_RK3066
 	bool "RK3066"
@@ -103,6 +106,17 @@ choice
 endchoice
 
 choice
+	prompt "RK3028 Board Type"
+	depends on SOC_RK3028
+
+config MACH_RK3028_TB
+	bool "RK3028 Top Board"
+
+config MACH_RK3028_86V
+        bool "RK3028 86V Board"
+endchoice
+
+choice
 	prompt "RK3066B Board Type"
 	depends on SOC_RK3066B
 
@@ -115,15 +129,6 @@ config MACH_RK3066B_SDK
 
 config MACH_RK3066B_M701
 	bool "RK3066B M701 board"
-
-endchoice
-
-choice
-	prompt "RK3168M Board Type"
-	depends on SOC_RK3168M
-
-config MACH_RK3168M_TB
-	bool "RK3168M Top Board"
 
 endchoice
 
@@ -151,5 +156,21 @@ config MACH_RK3168_DS1006H
 
 config MACH_RK3168_86V
 	bool "RK3168 86V Board"
+
+config MACH_RK3168_86V_OLD
+        bool "RK3168 86V  Old Board"
+        
+config MACH_RK3168_FAC
+        bool "RK3168 Board for factory"
+        select MACH_RK_FAC
+
+endchoice
+
+choice
+	prompt "RK3168M Board Type"
+	depends on SOC_RK3168M
+
+config MACH_RK3168M_TB
+	bool "RK3168M Top Board"
 
 endchoice
