@@ -13,26 +13,32 @@ Linux kernel for Rockchip SOCs - www.omegamoon.com
 - When ready, the device will be rebooted automatically
 
 **Revision history:**
+
 2014-03-17:
 - Added basic RK3066 MK808B support (needs testing)
+
 2014-03-10:
 - Sound fixed on RK1000 (Radxa)
 - USB Hub fixed (Radxa)
 - Fixed networking
+
 2014-03-08:
 - Fixed 1080p resolution
+
 2014-02-14:
 - Backporting DRM from sunxi (v3.4.67) linux 
 - Backporting Mali from sunxi (v3.4.67) linux 
 - Merging in tablet video drivers from Tronsmart KitKat kernel
 - Added Mali support
 - Added rk30-ipp 1.003 driver
+
 2013-12-08:
 - Upgraded to Linux kernel version 3.0.101+
 - Added Asus BT400 Bluetooth 4.0 support
 - Added Radxa Rock support
 - Added Minix Neo X7 support
 - Added various configs for booting linux from SD
+
 2013-09-27:
 - Upgraded to Linux kernel version 3.0.72+
 - Merged with rockchip git
