@@ -166,6 +166,21 @@ config USB_NET_AX8817X
 	  This driver creates an interface named "ethX", where X depends on
 	  what other networking devices you have in use.
 
+config USB_NET_AX88179
+        tristate "ASIX AX88179_178A Based USB 3.0/2.0 Gigabit Ethernet Adapters"
+        depends on USB_USBNET
+        select CRC32
+        default y
+        help
+          This option adds support for ASIX AX88179_178A based USB 3.0/2.0
+          10/100/1000 Ethernet adapters.
+
+          This driver should work with at least the following devices:
+            * ASIX AX88179
+
+          This driver creates an interface named "ethX", where X depends on
+          what other networking devices you have in use.
+
 config USB_NET_CDCETHER
 	tristate "CDC Ethernet support (smart devices such as cable modems)"
 	depends on USB_USBNET
